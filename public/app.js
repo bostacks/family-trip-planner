@@ -5,6 +5,7 @@ let cityFilter = "All";
 let currentDayId = null;
 let recCtx = null; // { dayId, slot }
 let recMode = "todo"; // 'todo' | 'food'
+let recQuery = ""; // suggestion search text
 
 function loadTrip() {
   try {
@@ -354,47 +355,72 @@ function itemAction(act, dayId, slot, itemId) {
 function openRecommend(dayId, slot) {
   recCtx = { dayId, slot };
   recMode = slot === "lunch" ? "food" : "todo";
+  recQuery = "";
   document.getElementById("sheet").classList.remove("hidden");
   document.getElementById("sheet-title").textContent = `${SLOT_LABEL[slot]} ideas`;
-  fetchRecommendations();
+  buildSheet();
 }
 function closeSheet() { document.getElementById("sheet").classList.add("hidden"); }
 
-// Recommendations come from the baked-in, pre-researched SEED_RECS (no API key
-// needed). Filters out anything already on the day so suggestions don't duplicate.
-function fetchRecommendations() {
+// Build the sheet shell ONCE (search box + toolbar + results container) so that
+// typing in search doesn't rebuild/refocus the input. Only the results refresh.
+function buildSheet() {
   const d = findDay(recCtx.dayId);
-  const city = (window.SEED_RECS || {})[d.city];
-  const pool = (city && (recMode === "food" ? city.food : city.todo)) || [];
-  const already = new Set(
-    d.blocks.flatMap((b) => b.items).map((i) => (i.name || "").toLowerCase())
-  );
-  const options = pool.filter((o) => !already.has((o.name || "").toLowerCase()));
-  const note = city
-    ? null
-    : `No baked-in recommendations for ${d.city} yet. Regenerate recommendations.js to add some.`;
-  renderRecs({ options, note });
-}
-function renderRecs(data) {
   const bodyEl = document.getElementById("sheet-body");
-  const toolbar = `
+  bodyEl.innerHTML = `
+    <div class="rec-search">
+      <span class="rec-search-ico">🔎</span>
+      <input id="rec-q" type="search" placeholder="Search places in ${d.city}…" autocomplete="off" value="${recQuery.replace(/"/g, "&quot;")}" />
+    </div>
     <div class="rec-toolbar">
       <button class="${recMode === "todo" ? "active" : ""}" data-mode="todo">Things to do</button>
       <button class="${recMode === "food" ? "active" : ""}" data-mode="food">Restaurants</button>
-    </div>`;
-  let inner = "";
-  if (data.note) inner += `<div class="notice">${data.note}</div>`;
-  if (!data.options || !data.options.length) {
-    inner += `<div class="empty">No options returned. Try again, or switch mode.</div>`;
-  } else {
-    inner += data.options.map((o, i) => recHtml(o, i)).join("");
+    </div>
+    <div id="rec-results"></div>`;
+  const q = bodyEl.querySelector("#rec-q");
+  q.oninput = () => { recQuery = q.value; updateRecResults(); };
+  bodyEl.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => {
+    recMode = b.dataset.mode;
+    bodyEl.querySelectorAll("[data-mode]").forEach((x) => x.classList.toggle("active", x.dataset.mode === recMode));
+    updateRecResults();
+  });
+  updateRecResults();
+  if (recQuery) q.focus();
+}
+
+// Recommendations come from the baked-in SEED_RECS (no API key). With a search
+// query we match across BOTH things-to-do and restaurants for the city; without
+// one we show the active toggle's list. Anything already on the day is hidden.
+function updateRecResults() {
+  const d = findDay(recCtx.dayId);
+  const city = (window.SEED_RECS || {})[d.city];
+  const resultsEl = document.getElementById("rec-results");
+  const toolbar = document.querySelector(".rec-toolbar");
+  if (!resultsEl) return;
+  if (!city) {
+    resultsEl.innerHTML = `<div class="notice">No baked-in recommendations for ${d.city} yet.</div>`;
+    return;
   }
-  bodyEl.innerHTML = toolbar + inner;
-  bodyEl.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { recMode = b.dataset.mode; fetchRecommendations(); });
-  // stash options for add
-  window.__recs = data.options || [];
-  bodyEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
-  hydrateGalleries(bodyEl);
+  const query = recQuery.trim().toLowerCase();
+  const terms = query.split(/\s+/).filter(Boolean);
+  if (toolbar) toolbar.style.display = query ? "none" : "";
+  const already = new Set(d.blocks.flatMap((b) => b.items).map((i) => (i.name || "").toLowerCase()));
+  let pool = query ? [...city.todo, ...city.food] : (recMode === "food" ? city.food : city.todo);
+  let options = pool.filter((o) => !already.has((o.name || "").toLowerCase()));
+  if (terms.length) {
+    options = options.filter((o) => {
+      const hay = `${o.name} ${o.area || ""} ${o.type || ""} ${o.why || ""} ${o.desc || ""}`.toLowerCase();
+      return terms.every((t) => hay.includes(t));
+    });
+  }
+  let inner = query ? `<div class="rec-count">${options.length} match${options.length === 1 ? "" : "es"} in ${d.city}</div>` : "";
+  inner += options.length
+    ? options.map((o, i) => recHtml(o, i)).join("")
+    : `<div class="empty">${query ? "No places match your search." : "Nothing left to suggest here."}</div>`;
+  resultsEl.innerHTML = inner;
+  window.__recs = options;
+  resultsEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
+  hydrateGalleries(resultsEl);
 }
 // Outbound link: prefer a curated official/booking URL, else a Google Maps
 // search that always resolves to the real place (hours, reviews, directions).
