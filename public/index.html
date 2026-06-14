@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Asia Trip 2026</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="appbar">
+      <div class="appbar-row">
+        <h1 id="trip-title">Asia Trip 2026</h1>
+        <span id="trip-sub" class="sub"></span>
+      </div>
+      <div id="city-strip" class="city-strip"></div>
+    </header>
+
+    <!-- Views -->
+    <main id="view-itinerary" class="view active"></main>
+    <main id="view-day" class="view"></main>
+    <main id="view-map" class="view">
+      <div id="map"></div>
+    </main>
+
+    <!-- Bottom nav -->
+    <nav class="tabbar">
+      <button class="tab active" data-view="itinerary">🗓️<span>Itinerary</span></button>
+      <button class="tab" data-view="map">🗺️<span>Map</span></button>
+    </nav>
+  </div>
+
+  <!-- Recommend sheet -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <strong id="sheet-title">Recommendations</strong>
+        <button id="sheet-close" class="icon-btn">✕</button>
+      </div>
+      <div id="sheet-body" class="sheet-body"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

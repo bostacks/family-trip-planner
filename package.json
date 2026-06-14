@@ -1,0 +1,15 @@
+{
+  "name": "asia-trip-planner",
+  "version": "1.0.0",
+  "description": "Mobile-first Asia trip planner with live AI recommendations, calendar day-blocks, and an embedded map.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {}
+}

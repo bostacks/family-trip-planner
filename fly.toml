@@ -1,0 +1,21 @@
+# fly.io config — used later when we deploy.
+# Steps (for reference, when ready):
+#   fly launch --no-deploy   (or use this file)
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-...
+#   fly deploy
+
+app = "asia-trip-planner"
+primary_region = "nrt"   # Tokyo — close to where you'll be
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
