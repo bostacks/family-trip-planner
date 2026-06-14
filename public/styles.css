@@ -38,6 +38,15 @@ body::before {
 button { font-family: inherit; }
 
 
+/* Pull-to-refresh indicator */
+.ptr { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 45; transform: translateY(-58px); opacity: 0; }
+.ptr.animating { transition: transform .25s ease, opacity .25s ease; }
+.ptr-ring { margin-top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(43,38,32,.18); position: relative; }
+.ptr-ring::after { content: "↓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--muted); }
+.ptr.ready .ptr-ring::after { content: "↑"; color: var(--accent); }
+.ptr-ring.spin { border: 2.5px solid var(--line-strong); border-top-color: var(--accent); animation: spin .7s linear infinite; }
+.ptr-ring.spin::after { content: ""; }
+
 /* Login gate */
 .gate { position: fixed; inset: 0; z-index: 100; align-items: center; justify-content: center; padding: 24px; background: var(--paper); }
 .gate-card {
@@ -298,7 +307,7 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 .rec-actions { display: flex; gap: 8px; margin-top: 12px; align-items: stretch; }
 .rec-actions .add { flex: 1; }
 .reclink { flex: 0 0 auto; display: inline-flex; align-items: center; text-decoration: none; border: 1px solid var(--accent); border-radius: 10px; padding: 9px 13px; font-size: 12.5px; font-weight: 600; color: var(--accent); background: transparent; }
-.rec-search { position: relative; margin-bottom: 12px; }
+.rec-search { position: sticky; top: 0; z-index: 3; margin-bottom: 12px; padding-top: 2px; background: var(--paper); }
 .rec-search-ico { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .6; pointer-events: none; }
 .rec-search input {
   width: 100%; font-family: inherit; font-size: 15px; padding: 11px 13px 11px 36px;

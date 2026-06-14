@@ -541,6 +541,71 @@ function initLightbox() {
     openLightbox(imgs, imgs.indexOf(img.src));
   });
 }
+
+/* ===== Pull-to-refresh (touch) ===== */
+// Custom because the app sets overscroll-behavior:none (which disables the
+// browser's native pull-to-refresh). Only engages at the very top of the
+// itinerary/day views, not in the map/sheet/lightbox or while dragging a card.
+function initPullToRefresh() {
+  const ptr = document.createElement("div");
+  ptr.id = "ptr"; ptr.className = "ptr";
+  ptr.innerHTML = `<div class="ptr-ring"></div>`;
+  document.body.appendChild(ptr);
+  const ring = ptr.querySelector(".ptr-ring");
+  const TH = 70, MAX = 110;
+  let startY = null, startX = null, pulling = false, dist = 0;
+
+  const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+  function eligible(t) {
+    if (document.documentElement.classList.contains("locked")) return false;
+    if (drag) return false;
+    if (currentView === "map") return false;
+    if (!document.getElementById("sheet").classList.contains("hidden")) return false;
+    if (!document.getElementById("lightbox").classList.contains("hidden")) return false;
+    if (t && t.closest && t.closest("#map, .sheet, .lightbox, .ev-drag")) return false;
+    return true;
+  }
+  function set(d) {
+    dist = d;
+    ptr.style.transform = `translateY(${d - 58}px)`;
+    ptr.style.opacity = Math.min(1, d / TH);
+    ring.style.transform = `rotate(${d * 3}deg)`;
+    ptr.classList.toggle("ready", d >= TH);
+  }
+  function reset() {
+    ptr.classList.add("animating");
+    ptr.style.transform = "translateY(-58px)"; ptr.style.opacity = "0";
+    ring.classList.remove("spin"); ptr.classList.remove("ready"); dist = 0;
+  }
+  function refresh() {
+    ptr.classList.add("animating", "ready");
+    ptr.style.transform = "translateY(10px)"; ptr.style.opacity = "1";
+    ring.style.transform = ""; ring.classList.add("spin");
+    setTimeout(() => location.reload(), 550);
+  }
+  document.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1 || !atTop() || !eligible(e.target)) { startY = null; return; }
+    startY = e.touches[0].clientY; startX = e.touches[0].clientX; pulling = false;
+    ptr.classList.remove("animating");
+  }, { passive: true });
+  document.addEventListener("touchmove", (e) => {
+    if (startY == null) return;
+    const dy = e.touches[0].clientY - startY, dx = e.touches[0].clientX - startX;
+    if (!pulling) {
+      if (dy < 10 || Math.abs(dx) > Math.abs(dy)) { if (dy < -2) startY = null; return; }
+      if (!atTop() || drag) { startY = null; return; }
+      pulling = true;
+    }
+    e.preventDefault(); // hold the page while pulling
+    set(Math.min(MAX, dy * 0.5));
+  }, { passive: false });
+  function end() {
+    if (pulling) { dist >= TH ? refresh() : reset(); }
+    startY = null; pulling = false;
+  }
+  document.addEventListener("touchend", end);
+  document.addEventListener("touchcancel", end);
+}
 function recHtml(o, i) {
   const city = findDay(recCtx.dayId)?.city;
   const official = !!o.url;
@@ -765,6 +830,7 @@ document.querySelectorAll(".tab").forEach((t) => t.onclick = () => navigate(t.da
 document.getElementById("sheet-close").onclick = closeSheet;
 document.querySelector(".sheet-backdrop").onclick = closeSheet;
 initLightbox();
+initPullToRefresh();
 document.getElementById("view-day").addEventListener("pointerdown", onDragDown);
 // Left/right arrows page between days (when in a day view and no lightbox open).
 document.addEventListener("keydown", (e) => {
