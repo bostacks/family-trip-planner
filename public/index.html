@@ -17,8 +17,24 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,560;9..144,600&family=Inter:wght@400;500;600;650;700&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- Critical gate rules + auth check run before <body> paints, so the app
+       never flashes before the login screen. -->
+  <style>#gate{display:none}html.locked #gate{display:flex}html.locked #app,html.locked .tabbar{display:none!important}</style>
+  <script src="auth.js"></script>
 </head>
 <body>
+  <!-- Login gate -->
+  <div id="gate" class="gate">
+    <form id="gate-form" class="gate-card">
+      <div class="gate-logo">✈</div>
+      <h1>Asia Trip 2026</h1>
+      <p class="gate-sub">Enter the password to view the plan.</p>
+      <input id="gate-pw" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password" autofocus />
+      <button type="submit">Unlock</button>
+      <div id="gate-err" class="gate-err" role="alert"></div>
+    </form>
+  </div>
+
   <div id="app">
     <!-- Header -->
     <header class="appbar">

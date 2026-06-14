@@ -22,6 +22,12 @@ python3 -m http.server -d public 8080   # → http://localhost:8080
 ```
 No install, no API key. To refresh the curated picks, open the project in Claude Code and ask it to "refresh the recommendations."
 
+## Access
+The app is behind a simple password gate (`public/auth.js`). Only the **SHA-256 hash** of the
+password is stored — never the plaintext. It's a soft gate for a public static site (it keeps
+casual visitors out, not a determined one), which is why all genuinely private data (booking
+confirmation codes, seat numbers) has been removed from the app entirely.
+
 ## Deploy (GitHub Pages)
 Already wired: `.github/workflows/pages.yml` publishes `public/` to Pages on every push to `main`.
 One-time: in the repo, **Settings → Pages → Source: GitHub Actions**. Site goes live at

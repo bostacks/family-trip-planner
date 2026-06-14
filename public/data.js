@@ -101,8 +101,8 @@ window.SEED_TRIP = {
             notes: "Check out of the Imperial Hotel Osaka and head to Kansai Airport (~50–65 min by JR Haruka express or Nankai line). Aim to arrive ~2.5h before the 10:30 flight.", booking: "—", locked: true },
           { name: "✈ Osaka → Seoul · Asiana OZ 111", type: "transit", rating: null, start: 630, dur: 130, lat: 37.4602, lng: 126.4407, area: "KIX T1 → ICN T2",
             notes: "Depart Kansai (KIX) 10:30 → arrive Incheon (ICN) 12:40 · 2h10m non-stop · Economy.",
-            desc: "Asiana Airlines OZ 111, operated by Asiana. Airbus A330-300. Osaka Kansai International Terminal 1 → Seoul Incheon International Terminal 2. Airline confirmation BL3BMN. From ICN, allow ~70 min by AREX train or car into central Seoul.",
-            booking: "Conf BL3BMN", locked: true },
+            desc: "Asiana Airlines OZ 111, operated by Asiana. Airbus A330-300. Osaka Kansai International Terminal 1 → Seoul Incheon International Terminal 2. From ICN, allow ~70 min by AREX train or car into central Seoul.",
+            booking: "Booked", locked: true },
         ]},
         { slot: "evening", items: [
           { name: "Myeongdong street food", type: "food", rating: 4.3, lat: 37.5636, lng: 126.9869, area: "Jung-gu", notes: "Night market eats; nearby Namdaemun + Myeongdong Cathedral.", booking: "Walk-in", locked: false },
@@ -144,8 +144,8 @@ window.SEED_TRIP = {
         { slot: "lunch", items: [
           { name: "✈ Seoul → Beijing · Asiana OZ 333", type: "transit", rating: null, start: 770, dur: 70, lat: 40.0799, lng: 116.6031, area: "ICN T2 → PEK T3",
             notes: "Depart Incheon (ICN) 12:50 → arrive Beijing Capital (PEK) 14:00 Beijing time · 2h10m non-stop · Economy.",
-            desc: "Asiana Airlines OZ 333, operated by Asiana. Airbus A330-300. Seoul Incheon Terminal 2 → Beijing Capital Terminal 3. Seats 23G, 23H, 23K, 22H, 22K. Airline confirmation BLAQTR. Beijing is 1h behind Seoul; allow time for immigration before the Grand Hyatt.",
-            booking: "Conf BLAQTR", locked: true },
+            desc: "Asiana Airlines OZ 333, operated by Asiana. Airbus A330-300. Seoul Incheon Terminal 2 → Beijing Capital Terminal 3. Beijing is 1h behind Seoul; allow time for immigration before the Grand Hyatt.",
+            booking: "Booked", locked: true },
         ]},
         { slot: "evening", items: [
           { name: "Wangfujing walking street", type: "shopping", rating: 4.1, lat: 39.9149, lng: 116.4109, area: "Dongcheng", notes: "Steps from hotel; snack street, Tiananmen lit up nearby.", booking: "Walk-in", locked: false },
@@ -198,14 +198,14 @@ window.SEED_TRIP = {
         { slot: "afternoon", items: [
           { name: "✈ Beijing → Tokyo · ANA NH 962", type: "transit", rating: null, start: 910, dur: 265, lat: 35.5494, lng: 139.7798, area: "PEK → HND",
             notes: "Depart Beijing Capital (PEK) 15:10 → arrive Tokyo Haneda (HND) 19:35 · 3h25m non-stop · Business.",
-            desc: "All Nippon Airways NH 962. Boeing 777-300ER. Beijing Capital Terminal 3 → Tokyo Haneda. Business class, seats 9D, 8G, 8K, 10G, 10K. Airline confirmation A7RDU9. Connect at Haneda for the Vancouver flight — allow time for the international transfer.",
-            booking: "Conf A7RDU9", locked: true },
+            desc: "All Nippon Airways NH 962. Boeing 777-300ER. Beijing Capital Terminal 3 → Tokyo Haneda. Business class. Connect at Haneda for the Vancouver flight — allow time for the international transfer.",
+            booking: "Booked", locked: true },
         ]},
         { slot: "evening", items: [
           { name: "✈ Tokyo → Vancouver · ANA NH 116", type: "transit", rating: null, start: 1315, dur: 1015, lat: 49.1947, lng: -123.1792, area: "HND → YVR",
             notes: "Depart Tokyo Haneda (HND) 21:55 → arrive Vancouver (YVR) 14:50 the same day · 8h55m non-stop · Business.",
-            desc: "All Nippon Airways NH 116. Boeing 787-9. Tokyo Haneda → Vancouver International. Business class. Airline confirmation A7RDU9. Arrives Vancouver 2:50 PM the same calendar day (crosses the date line). Free 24-hour cancellation via Manage My Trips within 24h of booking.",
-            booking: "Conf A7RDU9", locked: true },
+            desc: "All Nippon Airways NH 116. Boeing 787-9. Tokyo Haneda → Vancouver International. Business class. Arrives Vancouver 2:50 PM the same calendar day (crosses the date line). Free 24-hour cancellation via Manage My Trips within 24h of booking.",
+            booking: "Booked", locked: true },
         ]},
       ],
     },
