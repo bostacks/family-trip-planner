@@ -331,16 +331,17 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
  * ========================================================================== */
 @keyframes popin { from { opacity: 0; transform: translate(-50%, -47%) scale(.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @media (min-width: 720px) {
-  #app { max-width: 1040px; margin: 0 auto; box-shadow: 0 0 0 1px var(--line); }
-  .tabbar { left: 50%; transform: translateX(-50%); right: auto; width: 100%; max-width: 1040px; }
-  .view { padding: 22px 26px 96px; }
+  /* Fluid: the app fills the window (no fixed cap), and the itinerary grid adds
+     more columns live as you widen/resize. The full-width tab bar (default) and
+     sticky header span the window too. */
+  .view { padding: 22px 28px 96px; }
 
-  /* Itinerary → responsive card grid that fills the width */
-  #view-itinerary.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; align-content: start; }
+  /* Itinerary → responsive card grid; auto-fill reflows columns as it resizes */
+  #view-itinerary.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; align-content: start; }
   .daycard { margin-bottom: 0; }
 
-  /* Day view + map read best capped and centred */
-  #view-day { max-width: 820px; margin-inline: auto; width: 100%; }
+  /* Day view + map read best as a centred column within the wide shell */
+  #view-day { max-width: 860px; margin-inline: auto; width: 100%; }
   #map { height: calc(100dvh - 64px - 132px); }
 
   /* Recommend sheet → centred modal dialog instead of a full-width bottom sheet */
@@ -350,4 +351,6 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
     border-radius: 18px; animation: popin .18s ease;
   }
 }
-@media (min-width: 1100px) { .view { padding: 26px 32px 96px; } }
+/* Wider gutters as the window grows, so the fluid grid breathes */
+@media (min-width: 1100px) { .view { padding: 26px 40px 96px; } }
+@media (min-width: 1700px) { .view { padding: 30px 64px 96px; } }
