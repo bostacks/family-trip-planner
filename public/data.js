@@ -12,8 +12,12 @@ window.SEED_TRIP = {
     {
       id: "d0618", date: "2026-06-18", weekday: "Thu", city: "Transit",
       blocks: [
+        { slot: "afternoon", items: [
+          { name: "🧳 Head to YVR — international check-in", type: "transit", rating: null, start: 825, dur: 60, lat: 49.1947, lng: -123.1792, area: "→ YVR",
+            notes: "Aim to be at Vancouver International ~3h before the 4:45pm departure. Allow time to check bags and clear security.", booking: "—", locked: true },
+        ]},
         { slot: "evening", items: [
-          { name: "Depart Vancouver YVR 4:45pm — Flight NH115", type: "transit", rating: null, lat: 49.1947, lng: -123.1792, area: "YVR", notes: "Overnight flight to Tokyo Haneda. Crosses date line.", booking: "Booked", locked: true },
+          { name: "Depart Vancouver YVR 4:45pm — Flight NH115", type: "transit", rating: null, start: 1005, dur: 600, lat: 49.1947, lng: -123.1792, area: "YVR → HND", notes: "Overnight flight to Tokyo Haneda. Crosses date line.", booking: "Booked", locked: true },
         ]},
       ],
     },
@@ -92,8 +96,13 @@ window.SEED_TRIP = {
     {
       id: "d0625", date: "2026-06-25", weekday: "Thu", city: "Seoul",
       blocks: [
-        { slot: "afternoon", items: [
-          { name: "Fly Osaka → Seoul", type: "transit", rating: null, lat: 37.4602, lng: 126.4407, area: "ICN", notes: "Check in, settle. Light arrival day.", booking: "Flight", locked: true },
+        { slot: "morning", items: [
+          { name: "🧳 Check out & travel to Kansai (KIX)", type: "transit", rating: null, start: 405, dur: 75, lat: 34.4347, lng: 135.2440, area: "Osaka hotel → KIX",
+            notes: "Check out of the Imperial Hotel Osaka and head to Kansai Airport (~50–65 min by JR Haruka express or Nankai line). Aim to arrive ~2.5h before the 10:30 flight.", booking: "—", locked: true },
+          { name: "✈ Osaka → Seoul · Asiana OZ 111", type: "transit", rating: null, start: 630, dur: 130, lat: 37.4602, lng: 126.4407, area: "KIX T1 → ICN T2",
+            notes: "Depart Kansai (KIX) 10:30 → arrive Incheon (ICN) 12:40 · 2h10m non-stop · Economy.",
+            desc: "Asiana Airlines OZ 111, operated by Asiana. Airbus A330-300. Osaka Kansai International Terminal 1 → Seoul Incheon International Terminal 2. Airline confirmation BL3BMN. From ICN, allow ~70 min by AREX train or car into central Seoul.",
+            booking: "Conf BL3BMN", locked: true },
         ]},
         { slot: "evening", items: [
           { name: "Myeongdong street food", type: "food", rating: 4.3, lat: 37.5636, lng: 126.9869, area: "Jung-gu", notes: "Night market eats; nearby Namdaemun + Myeongdong Cathedral.", booking: "Walk-in", locked: false },
@@ -128,8 +137,15 @@ window.SEED_TRIP = {
     {
       id: "d0628", date: "2026-06-28", weekday: "Sun", city: "Beijing",
       blocks: [
-        { slot: "afternoon", items: [
-          { name: "Fly Seoul → Beijing", type: "transit", rating: null, lat: 40.0799, lng: 116.6031, area: "PEK", notes: "Allow time for immigration. Check in at Grand Hyatt.", booking: "Flight", locked: true },
+        { slot: "morning", items: [
+          { name: "🧳 Check out & travel to Incheon (ICN)", type: "transit", rating: null, start: 555, dur: 75, lat: 37.4602, lng: 126.4407, area: "Seoul hotel → ICN",
+            notes: "Check out of the Seoul hotel and take the AREX train or a car to Incheon (~60 min). Aim to arrive ~2.5h before the 12:50 flight.", booking: "—", locked: true },
+        ]},
+        { slot: "lunch", items: [
+          { name: "✈ Seoul → Beijing · Asiana OZ 333", type: "transit", rating: null, start: 770, dur: 70, lat: 40.0799, lng: 116.6031, area: "ICN T2 → PEK T3",
+            notes: "Depart Incheon (ICN) 12:50 → arrive Beijing Capital (PEK) 14:00 Beijing time · 2h10m non-stop · Economy.",
+            desc: "Asiana Airlines OZ 333, operated by Asiana. Airbus A330-300. Seoul Incheon Terminal 2 → Beijing Capital Terminal 3. Seats 23G, 23H, 23K, 22H, 22K. Airline confirmation BLAQTR. Beijing is 1h behind Seoul; allow time for immigration before the Grand Hyatt.",
+            booking: "Conf BLAQTR", locked: true },
         ]},
         { slot: "evening", items: [
           { name: "Wangfujing walking street", type: "shopping", rating: 4.1, lat: 39.9149, lng: 116.4109, area: "Dongcheng", notes: "Steps from hotel; snack street, Tiananmen lit up nearby.", booking: "Walk-in", locked: false },
@@ -176,9 +192,49 @@ window.SEED_TRIP = {
       id: "d0702", date: "2026-07-02", weekday: "Thu", city: "Transit",
       blocks: [
         { slot: "morning", items: [
-          { name: "Depart Beijing", type: "transit", rating: null, lat: 40.0799, lng: 116.6031, area: "PEK", notes: "Fly home.", booking: "Flight", locked: true },
+          { name: "🧳 Check out & travel to Beijing Capital (PEK)", type: "transit", rating: null, start: 690, dur: 75, lat: 40.0799, lng: 116.6031, area: "Grand Hyatt → PEK",
+            notes: "Check out of the Grand Hyatt and head to Beijing Capital Airport (~45–60 min; allow for traffic). Aim to arrive ~3h before the 15:10 international flight.", booking: "—", locked: true },
+        ]},
+        { slot: "afternoon", items: [
+          { name: "✈ Beijing → Tokyo · ANA NH 962", type: "transit", rating: null, start: 910, dur: 265, lat: 35.5494, lng: 139.7798, area: "PEK → HND",
+            notes: "Depart Beijing Capital (PEK) 15:10 → arrive Tokyo Haneda (HND) 19:35 · 3h25m non-stop · Business.",
+            desc: "All Nippon Airways NH 962. Boeing 777-300ER. Beijing Capital Terminal 3 → Tokyo Haneda. Business class, seats 9D, 8G, 8K, 10G, 10K. Airline confirmation A7RDU9. Connect at Haneda for the Vancouver flight — allow time for the international transfer.",
+            booking: "Conf A7RDU9", locked: true },
+        ]},
+        { slot: "evening", items: [
+          { name: "✈ Tokyo → Vancouver · ANA NH 116", type: "transit", rating: null, start: 1315, dur: 1015, lat: 49.1947, lng: -123.1792, area: "HND → YVR",
+            notes: "Depart Tokyo Haneda (HND) 21:55 → arrive Vancouver (YVR) 14:50 the same day · 8h55m non-stop · Business.",
+            desc: "All Nippon Airways NH 116. Boeing 787-9. Tokyo Haneda → Vancouver International. Business class. Airline confirmation A7RDU9. Arrives Vancouver 2:50 PM the same calendar day (crosses the date line). Free 24-hour cancellation via Manage My Trips within 24h of booking.",
+            booking: "Conf A7RDU9", locked: true },
         ]},
       ],
     },
   ],
+};
+
+/* Per-city public-transport primer: how the system works, how to get a pass/
+ * card, and practical tips. Shown as a "Getting around" panel atop each city's
+ * day. Getting from stop to stop is handled live by the "🚇 from <prev>" link
+ * on each event (Google/Naver-style transit directions from your last stop). */
+window.CITY_TRANSIT = {
+  Tokyo: {
+    intro: "Two subway operators (Tokyo Metro + Toei) plus JR lines plait together over the city; the JR Yamanote loop strings the big hubs. It's dense but superbly signed in English.",
+    pass: "Get a Suica or PASMO IC card and just tap on/off every train, subway and bus. Easiest: add Suica to your phone's Apple/Google Wallet and top up with a card — instant, no deposit. Otherwise buy a Welcome Suica or PASMO Passport (tourist cards, no deposit) from a ticket machine at Haneda or any station. Kids 6–11 ride half-fare on a child IC card; under 6 free.",
+    tips: "Tap in AND out at the gates. Google Maps gives accurate platform-level routing here. Dodge rush hour (7:30–9:00) with kids. If you'll ride the subway a lot in a day, a tourist-only Tokyo Subway 24/48/72-hour Ticket (sold at the airports) can work out cheaper.",
+  },
+  Osaka: {
+    intro: "Osaka Metro (the north–south Midosuji line links Umeda–Shinsaibashi–Namba–Tennoji) plus the JR Osaka Loop Line reach almost everything.",
+    pass: "Your Tokyo Suica/PASMO works here unchanged — no new card needed. The local card is ICOCA (from JR machines). For a packed sightseeing day, the Osaka Amazing Pass (1- or 2-day) gives unlimited subway/bus PLUS free entry to ~40 attractions including Osaka Castle and Umeda Sky Building.",
+    tips: "The Shinkansen from Tokyo arrives at Shin-Osaka — transfer to the Midosuji subway or JR for the centre. Google Maps works well. Same tap-in/out as Tokyo.",
+  },
+  Seoul: {
+    intro: "Seoul's metro is vast, spotless, cheap and fully English-signed; lines are numbered and colour-coded. Buses fill the gaps and share the same card.",
+    pass: "Buy a T-money card at any convenience store (CU, GS25, 7-Eleven) or station machine and top it up with cash, then tap on/off every subway and bus (bus transfers are discounted). A reloadable Korea Tour Card or the short-term Climate Card are alternatives. Kids 6–12 child fare; under 6 free.",
+    tips: "Use Naver Map or KakaoMap for routing — Google Maps transit is limited in Korea. Tap your T-money when boarding AND leaving buses to get the transfer discount. From Incheon, the AREX train reaches central Seoul in ~60 min.",
+  },
+  Beijing: {
+    intro: "Beijing's metro is huge and cheap (fares by distance); Line 1 and the Line 2 loop cover Tiananmen, the Forbidden City and Wangfujing.",
+    pass: "Simplest for most: set up the Beijing subway QR inside Alipay or WeChat (you'll need the app and a linked card) and scan in/out. Otherwise buy single-journey tickets from station machines, or a refundable Yikatong transit card. Note: you must show your passport at security to enter every subway station, and real-name ID is needed for some tickets.",
+    tips: "Google Maps doesn't work well in mainland China — use Apple Maps or Amap (高德), and a VPN for other apps. Allow extra time for the bag X-ray at every station entrance. Didi/taxis are cheap and easy for the airport and the Great Wall.",
+  },
 };

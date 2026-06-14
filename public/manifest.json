@@ -1,0 +1,14 @@
+{
+  "name": "Asia Trip 2026 — Planner",
+  "short_name": "Asia Trip",
+  "description": "Family trip planner: itinerary, calendar day view, maps, transit and ideas.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f0e8",
+  "theme_color": "#f4f0e8",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,5 +1,5 @@
 /* ===== State & persistence ===== */
-const LS_KEY = "asia-trip-2026-v1";
+const LS_KEY = "asia-trip-2026-v2";
 let trip = loadTrip();
 let cityFilter = "All";
 let currentDayId = null;
@@ -28,8 +28,40 @@ function resetTrip() {
 /* ===== Helpers ===== */
 const SLOTS = ["morning", "lunch", "afternoon", "evening"];
 const SLOT_LABEL = { morning: "Morning", lunch: "Midday", afternoon: "Afternoon", evening: "Evening" };
+const SLOT_HINT = { morning: "from 09:00", lunch: "from 12:00", afternoon: "from 14:00", evening: "from 18:00" };
+const SLOT_BASE = { morning: 9 * 60, lunch: 12 * 60, afternoon: 14 * 60, evening: 18 * 60 };
+const DUR_BY_TYPE = { experience: 180, sight: 120, museum: 120, park: 90, food: 75, shopping: 90, transit: 120 };
 const uid = () => "x" + Math.random().toString(36).slice(2, 9);
 const stars = (r) => (r ? "★ " + Number(r).toFixed(1) : "");
+const itemDur = (it) => it.dur || DUR_BY_TYPE[it.type] || 90;
+function fmtHM(min) {
+  min = ((min % 1440) + 1440) % 1440;
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+}
+function parseHM(s) {
+  const m = /^(\d{1,2}):?(\d{2})$/.exec((s || "").trim());
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
+}
+// Lay items out on a timeline. Honours an explicit it.start; otherwise flows
+// sequentially from each part-of-day's base time, leaving a 15-min gap.
+function computeSchedule(day) {
+  const out = [];
+  for (const slot of SLOTS) {
+    const block = day.blocks.find((b) => b.slot === slot);
+    if (!block) continue;
+    let cursor = SLOT_BASE[slot] ?? 9 * 60;
+    for (const it of block.items) {
+      const start = (typeof it.start === "number") ? it.start : Math.max(cursor, SLOT_BASE[slot] ?? cursor);
+      const end = start + itemDur(it);
+      out.push({ it, slot, start, end });
+      cursor = end + 15;
+    }
+  }
+  return out;
+}
 function cities() {
   const seen = [];
   trip.days.forEach((d) => { if (!seen.includes(d.city)) seen.push(d.city); });
@@ -55,7 +87,15 @@ function renderHeader() {
     .map((c) => `<button class="chip ${c === cityFilter ? "active" : ""}" data-city="${c}">${c}</button>`)
     .join("") + `<button class="chip" data-reset="1">↺ Reset</button>`;
   strip.querySelectorAll("[data-city]").forEach((b) =>
-    b.onclick = () => { cityFilter = b.dataset.city; renderHeader(); renderItinerary(); if (currentView === "map") drawMap(); }
+    b.onclick = () => {
+      cityFilter = b.dataset.city;
+      renderHeader();
+      renderItinerary();
+      // A filter is a list action: if we're on a day (or map), drop back to the
+      // day-by-day itinerary so the filter is actually visible.
+      if (currentView === "map") drawMap();
+      else if (currentView !== "itinerary") navigate("itinerary");
+    }
   );
   strip.querySelector("[data-reset]").onclick = resetTrip;
 }
@@ -90,63 +130,205 @@ function mainItem(day) {
 function countItems(day) { return day.blocks.reduce((n, b) => n + b.items.length, 0); }
 
 /* ===== Day detail view ===== */
-function openDay(id) {
-  currentDayId = id;
-  renderDay();
-  switchView("day");
-}
+// Navigation goes through the URL hash so the browser back/forward buttons and
+// breadcrumbs all stay in sync (see router section near the bottom).
+function openDay(id) { navigate(id); }
 function renderDay() {
   const d = findDay(currentDayId);
   if (!d) return;
+  ensureIds(d);
   const el = document.getElementById("view-day");
-  const blocksHtml = SLOTS.map((slot) => {
-    const block = d.blocks.find((b) => b.slot === slot);
-    const items = block ? block.items : [];
-    return `<div class="block">
-      <div class="block-title">
-        <span class="slot">${SLOT_LABEL[slot]}</span>
-        ${d.city !== "Transit" ? `<button class="btn-rec" data-rec="${slot}">✨ Recommend options</button>` : ""}
-      </div>
-      ${items.length ? items.map((it) => itemHtml(it)).join("") : `<div class="empty">Nothing here yet — tap “Recommend options”.</div>`}
-    </div>`;
-  }).join("");
+  const sched = computeSchedule(d);
+  const isTransit = d.city === "Transit";
 
-  el.innerHTML = `
+  const head = `
     <div class="day-head">
       <button class="back">‹ Back</button>
-      <div><h2>${fmtDate(d.date, d.weekday)} · ${d.city}</h2>
-      <span class="sub">${d.city !== "Transit" ? (trip.hotels[d.city]?.name || "") : "Travel day"}</span></div>
-    </div>
-    ${blocksHtml}`;
+      <div class="day-head-text">
+        <span class="eyebrow">${fmtDate(d.date, d.weekday)}</span>
+        <h2>${isTransit ? "Travel day" : d.city}</h2>
+        <span class="sub">${isTransit ? "In transit" : (trip.hotels[d.city]?.name || "")}</span>
+      </div>
+    </div>`;
 
-  el.querySelector(".back").onclick = () => switchView("itinerary");
+  // Prev/next walk the list you came from (filtered if a city is selected),
+  // falling back to the full itinerary if the current day isn't in that list.
+  let list = filteredDays();
+  if (!list.some((x) => x.id === d.id)) list = trip.days;
+  const pos = list.findIndex((x) => x.id === d.id);
+  const prev = list[pos - 1], next = list[pos + 1];
+  const navBtn = (day, dir) => day
+    ? `<button class="daynav ${dir}" data-go="${day.id}"><span class="daynav-dir">${dir === "prev" ? "‹ Previous" : "Next ›"}</span><span class="daynav-day">${fmtDate(day.date, day.weekday)} · ${day.city === "Transit" ? "Travel" : day.city}</span></button>`
+    : `<span class="daynav empty"></span>`;
+  const dayNav = `<div class="day-nav">${navBtn(prev, "prev")}${navBtn(next, "next")}</div>`;
+
+  // "Getting around" transit primer for this city.
+  const tr = window.CITY_TRANSIT?.[d.city];
+  const primer = (!isTransit && tr) ? `
+    <details class="primer">
+      <summary><span>🚇 Getting around ${d.city}</span><span class="primer-hint">passes &amp; transit</span></summary>
+      <div class="primer-body">
+        <p>${tr.intro}</p>
+        <p><strong>Passes:</strong> ${tr.pass}</p>
+        <p><strong>Tips:</strong> ${tr.tips}</p>
+      </div>
+    </details>` : "";
+
+  // For each event, the previous stop (or the hotel for the first) — used to
+  // build a "transit from here" directions link.
+  const hotel = trip.hotels[d.city];
+  const prevOf = {};
+  sched.forEach((s, i) => {
+    const p = i > 0 ? sched[i - 1].it : null;
+    prevOf[s.it.id] = (p && p.lat != null) ? { name: p.name, lat: p.lat, lng: p.lng }
+      : (hotel ? { name: hotel.name, lat: hotel.lat, lng: hotel.lng } : null);
+  });
+
+  // Calendar: one section per part-of-day, each a timeline of timed events.
+  const body = SLOTS.map((slot) => {
+    const rows = sched.filter((s) => s.slot === slot);
+    const events = rows.map((s) => calEvent(d, s, prevOf[s.it.id])).join("");
+    const suggest = isTransit ? "" : `<button class="suggest" data-rec="${slot}">✨ Suggest</button>`;
+    const empty = rows.length ? "" : `<button class="cal-empty" data-rec="${slot}">＋ Add something to the ${SLOT_LABEL[slot].toLowerCase()}</button>`;
+    return `<section class="cal-slot">
+      <div class="cal-slot-head">
+        <div><span class="cal-slot-name">${SLOT_LABEL[slot]}</span><span class="cal-slot-hint">${SLOT_HINT[slot]}</span></div>
+        ${suggest}
+      </div>
+      <div class="cal-track" data-slot="${slot}">${events || empty}</div>
+    </section>`;
+  }).join("");
+
+  el.innerHTML = head + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
+  el.querySelector(".back").onclick = () => (history.length > 1 ? history.back() : navigate("itinerary"));
+  el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
+  hydrateGalleries(el);
 }
-function itemHtml(it) {
-  const d = findDay(currentDayId);
-  const slot = d.blocks.find((b) => b.items.includes(it))?.slot;
-  return `<div class="item ${it.locked ? "locked" : ""}">
-    <div class="item-top">
-      <span class="name">${it.name}</span>
-      <span class="tag">${it.type || ""}</span>
+
+// Make a booking note clickable when it implies an action (reserve/buy/ticket…).
+// Links to the item's official/booking URL if it has one, else a Google search.
+function bookingLink(it, city) {
+  if (!it.booking || it.booking === "—") return null;
+  if (/^(conf|booked|flight)\b/i.test(it.booking)) return null; // already done / not bookable
+  if (!/reserve|book|buy|ticket|online|advance|passport|klook|e-ticket|smartex/i.test(it.booking)) return null;
+  return it.url || `https://www.google.com/search?q=${encodeURIComponent(`${it.name} ${city || ""} tickets booking`)}`;
+}
+function transitUrl(prev, it) {
+  return `https://www.google.com/maps/dir/?api=1&origin=${prev.lat},${prev.lng}&destination=${it.lat},${it.lng}&travelmode=transit`;
+}
+// One timed event on the calendar: a time rail on the left + a card.
+function calEvent(d, s, prev) {
+  const it = s.it;
+  const meta = [it.area ? `📍 ${it.area}` : "", it.price || "", it.rating ? stars(it.rating) : ""]
+    .filter(Boolean).map((x) => `<span>${x}</span>`).join("");
+  const a = (act, label, cls = "") =>
+    `<button class="ev-act ${cls}" data-act="${act}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}">${label}</button>`;
+  const draggable = it.type !== "transit";
+  const book = bookingLink(it, d.city);
+  const fromName = prev ? prev.name.replace(/\s*\(.*$/, "").trim() : "";
+  const fromShort = fromName.length > 26 ? fromName.slice(0, 24) + "…" : fromName;
+  const showTransit = prev && it.lat != null && it.type !== "transit";
+  return `<article class="cal-ev ${it.locked ? "locked" : ""} ${it.type === "transit" ? "is-transit" : ""}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}">
+    <div class="ev-rail"><span class="ev-time">${fmtHM(s.start)}</span><span class="ev-dot"></span><span class="ev-time end">${fmtHM(s.end)}</span></div>
+    <div class="ev-card">
+      <div class="ev-top">
+        ${draggable ? `<span class="ev-drag" title="Drag to move">⠿</span>` : ""}
+        <span class="ev-name">${it.name}</span>${it.type ? `<span class="ev-tag">${it.type}</span>` : ""}
+      </div>
+      ${it.type === "transit" ? "" : galleryShell(it.gq || it.mapsQuery || `${it.name} ${d.city}`)}
+      ${showTransit ? `<a class="ev-transit" href="${transitUrl(prev, it)}" target="_blank" rel="noopener">🚇 Transit from ${fromShort} ↗</a>` : ""}
+      ${meta ? `<div class="ev-meta">${meta}</div>` : ""}
+      ${it.booking && it.booking !== "—" ? (book
+        ? `<a class="ev-book link" href="${book}" target="_blank" rel="noopener">🎟️ ${it.booking} ↗</a>`
+        : `<div class="ev-book">🎟️ ${it.booking}</div>`) : ""}
+      ${it.notes ? `<p class="ev-notes">${it.notes}</p>` : ""}
+      ${it.desc ? `<p class="ev-desc">${it.desc}</p>` : ""}
+      <div class="ev-actions">
+        ${it.url ? `<a class="ev-act" href="${it.url}" target="_blank" rel="noopener">Open ↗</a>` : ""}
+        ${it.lat ? a("go", "Directions") : ""}
+        ${a("time", "Time")}
+        ${a("lock", it.locked ? "✓ Locked" : "Lock", it.locked ? "on" : "")}
+        ${a("del", "✕")}
+      </div>
     </div>
-    <div class="row">
-      ${it.rating ? `<span class="stars">${stars(it.rating)}</span>` : ""}
-      ${it.area ? `<span class="pill">📍 ${it.area}</span>` : ""}
-      ${it.price ? `<span class="pill">${it.price}</span>` : ""}
-      ${it.booking && it.booking !== "—" ? `<span class="pill book">🎟️ ${it.booking}</span>` : ""}
-    </div>
-    ${it.notes ? `<div class="notes">${it.notes}</div>` : ""}
-    <div class="item-actions">
-      ${it.lat ? `<button class="mini go" data-act="go" data-day="${d.id}" data-slot="${slot}" data-item="${it.id || ""}">🧭 Directions</button>` : ""}
-      <button class="mini lock ${it.locked ? "on" : ""}" data-act="lock" data-day="${d.id}" data-slot="${slot}" data-item="${it.id || ""}">${it.locked ? "✓ Locked" : "Lock in"}</button>
-      <button class="mini del" data-act="del" data-day="${d.id}" data-slot="${slot}" data-item="${it.id || ""}">🗑</button>
-    </div>
-  </div>`;
+  </article>`;
 }
 function ensureIds(day) {
   day.blocks.forEach((b) => b.items.forEach((it) => { if (!it.id) it.id = uid(); }));
+}
+
+/* ===== Drag-to-reschedule (pointer-based, works on touch + mouse) ===== */
+// Drag an event by its ⠿ handle to another part-of-day or position; times then
+// reflow from that slot's base time (use the "Time" button to pin an exact time).
+let drag = null;
+function moveItem(fromSlot, itemId, toSlot, toIndex) {
+  const d = findDay(currentDayId);
+  const fromBlock = d.blocks.find((b) => b.slot === fromSlot);
+  const i = fromBlock?.items.findIndex((x) => x.id === itemId);
+  if (i == null || i < 0) return;
+  const [it] = fromBlock.items.splice(i, 1);
+  let toBlock = d.blocks.find((b) => b.slot === toSlot);
+  if (!toBlock) { toBlock = { slot: toSlot, items: [] }; d.blocks.push(toBlock); }
+  delete it.start; // position now determines the time; reflow from slot base
+  toBlock.items.splice(Math.max(0, Math.min(toIndex, toBlock.items.length)), 0, it);
+  saveTrip(); renderDay(); renderItinerary();
+}
+function onDragDown(e) {
+  const handle = e.target.closest(".ev-drag");
+  if (!handle) return;
+  const ev = handle.closest(".cal-ev");
+  if (!ev) return;
+  e.preventDefault();
+  drag = { slot: ev.dataset.slot, itemId: ev.dataset.item, ev, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, ind: null, target: null };
+  document.addEventListener("pointermove", onDragMove);
+  document.addEventListener("pointerup", onDragUp, { once: true });
+}
+function onDragMove(e) {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 6) return;
+  e.preventDefault();
+  if (!drag.moved) {
+    drag.moved = true;
+    const r = drag.ev.querySelector(".ev-card").getBoundingClientRect();
+    const ghost = drag.ev.querySelector(".ev-card").cloneNode(true);
+    ghost.querySelectorAll(".gallery").forEach((g) => g.remove()); // keep the floating card light
+    ghost.className = "ev-card drag-ghost";
+    ghost.style.width = r.width + "px";
+    document.body.appendChild(ghost);
+    drag.ghost = ghost; drag.gw = r.width; drag.gh = ghost.getBoundingClientRect().height;
+    drag.ind = Object.assign(document.createElement("div"), { className: "drop-indicator" });
+    drag.ev.classList.add("dragging");
+    document.body.classList.add("is-dragging");
+  }
+  drag.ghost.style.left = (e.clientX - drag.gw / 2) + "px";
+  drag.ghost.style.top = (e.clientY - 18) + "px";
+  drag.ghost.style.display = "none"; // hide so elementFromPoint sees what's underneath
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  drag.ghost.style.display = "";
+  const track = under && under.closest(".cal-track");
+  if (!track) { if (drag.ind.parentNode) drag.ind.remove(); drag.target = null; return; }
+  const cards = [...track.querySelectorAll(".cal-ev")].filter((c) => c !== drag.ev);
+  let idx = cards.length;
+  for (let i = 0; i < cards.length; i++) {
+    const cr = cards[i].getBoundingClientRect();
+    if (e.clientY < cr.top + cr.height / 2) { idx = i; break; }
+  }
+  if (cards[idx]) track.insertBefore(drag.ind, cards[idx]); else track.appendChild(drag.ind);
+  drag.target = { slot: track.dataset.slot, idx };
+}
+function onDragUp() {
+  document.removeEventListener("pointermove", onDragMove);
+  const d = drag;
+  if (d) {
+    if (d.ghost) d.ghost.remove();
+    if (d.ind && d.ind.parentNode) d.ind.remove();
+    d.ev.classList.remove("dragging");
+    document.body.classList.remove("is-dragging");
+    if (d.moved && d.target) moveItem(d.slot, d.itemId, d.target.slot, d.target.idx);
+  }
+  drag = null;
 }
 function itemAction(act, dayId, slot, itemId) {
   const d = findDay(dayId); ensureIds(d);
@@ -156,6 +338,16 @@ function itemAction(act, dayId, slot, itemId) {
   if (act === "lock") { it.locked = !it.locked; saveTrip(); renderDay(); renderItinerary(); }
   else if (act === "del") { block.items = block.items.filter((x) => x.id !== itemId); saveTrip(); renderDay(); renderItinerary(); }
   else if (act === "go") { navigateTo(it); }
+  else if (act === "time") {
+    const cur = typeof it.start === "number" ? fmtHM(it.start) : "";
+    const input = prompt(`Start time for “${it.name}” (24h, e.g. 09:30):`, cur);
+    if (input === null) return;
+    const mins = parseHM(input);
+    if (input.trim() === "") { delete it.start; }
+    else if (mins == null) { alert("Please enter a time like 09:30."); return; }
+    else { it.start = mins; }
+    saveTrip(); renderDay();
+  }
 }
 
 /* ===== Recommend sheet (live AI) ===== */
@@ -168,32 +360,20 @@ function openRecommend(dayId, slot) {
 }
 function closeSheet() { document.getElementById("sheet").classList.add("hidden"); }
 
-async function fetchRecommendations() {
+// Recommendations come from the baked-in, pre-researched SEED_RECS (no API key
+// needed). Filters out anything already on the day so suggestions don't duplicate.
+function fetchRecommendations() {
   const d = findDay(recCtx.dayId);
-  const body = {
-    city: d.city, date: d.date, weekday: d.weekday, slot: recCtx.slot,
-    wantRestaurants: recMode === "food",
-    locked: d.blocks.flatMap((b) => b.items).filter((i) => i.locked).map((i) => i.name),
-    near: trip.hotels[d.city] ? { lat: trip.hotels[d.city].lat, lng: trip.hotels[d.city].lng, label: trip.hotels[d.city].name } : null,
-  };
-  const bodyEl = document.getElementById("sheet-body");
-  bodyEl.innerHTML = `
-    <div class="rec-toolbar">
-      <button class="${recMode === "todo" ? "active" : ""}" data-mode="todo">Things to do</button>
-      <button class="${recMode === "food" ? "active" : ""}" data-mode="food">Restaurants</button>
-    </div>
-    <div class="loading"><div class="spinner"></div>Researching live options in ${d.city}…</div>`;
-  bodyEl.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { recMode = b.dataset.mode; fetchRecommendations(); });
-
-  try {
-    const res = await fetch("/api/recommend", {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    renderRecs(data);
-  } catch (e) {
-    renderRecs({ options: [], usedAI: false, note: "Could not reach the recommendation service. Is the server running?" });
-  }
+  const city = (window.SEED_RECS || {})[d.city];
+  const pool = (city && (recMode === "food" ? city.food : city.todo)) || [];
+  const already = new Set(
+    d.blocks.flatMap((b) => b.items).map((i) => (i.name || "").toLowerCase())
+  );
+  const options = pool.filter((o) => !already.has((o.name || "").toLowerCase()));
+  const note = city
+    ? null
+    : `No baked-in recommendations for ${d.city} yet. Regenerate recommendations.js to add some.`;
+  renderRecs({ options, note });
 }
 function renderRecs(data) {
   const bodyEl = document.getElementById("sheet-body");
@@ -214,10 +394,133 @@ function renderRecs(data) {
   // stash options for add
   window.__recs = data.options || [];
   bodyEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
+  hydrateGalleries(bodyEl);
+}
+// Outbound link: prefer a curated official/booking URL, else a Google Maps
+// search that always resolves to the real place (hours, reviews, directions).
+function recLink(o, city) {
+  if (o.url) return o.url;
+  const q = o.mapsQuery || `${o.name} ${city || ""}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+/* ===== Media gallery =====================================================
+ * Images are pulled live (embedded, never downloaded) from Openverse — a
+ * keyless, CORS-enabled Creative-Commons image search — by place name. Results
+ * are cached in memory AND localStorage so a query is fetched at most once, and
+ * revisits/offline still show photos. A YouTube-search tile gives videos too.
+ */
+const IMG_LS = "asia-trip-img-v1";
+const galleryCache = new Map(Object.entries(loadImgCache()));
+function loadImgCache() { try { return JSON.parse(localStorage.getItem(IMG_LS) || "{}"); } catch { return {}; } }
+function saveImgCache() { try { localStorage.setItem(IMG_LS, JSON.stringify(Object.fromEntries(galleryCache))); } catch {} }
+const escAttr = (s) => String(s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+async function fetchImages(query) {
+  if (galleryCache.has(query)) return galleryCache.get(query);
+  let imgs = [];
+  try {
+    const r = await fetch(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=8&mature=false`);
+    if (r.ok) {
+      const d = await r.json();
+      imgs = (d.results || []).map((x) => x.thumbnail || x.url).filter(Boolean).slice(0, 8);
+    }
+  } catch {}
+  galleryCache.set(query, imgs);
+  saveImgCache();
+  return imgs;
+}
+// Placeholder strip; real media is injected by hydrateGalleries() after render.
+function galleryShell(query) {
+  return `<div class="gallery" data-gallery="${escAttr(query)}">
+    <div class="gallery-skel"></div><div class="gallery-skel"></div><div class="gallery-skel"></div>
+  </div>`;
+}
+async function fillGallery(el) {
+  if (el.dataset.done) return;
+  el.dataset.done = "1";
+  const query = el.dataset.gallery;
+  const yt = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+  const imgs = await fetchImages(query);
+  if (!imgs.length) {
+    el.classList.add("empty");
+    el.innerHTML = `<a class="gv-video solo" href="${yt}" target="_blank" rel="noopener">▶ Search videos &amp; photos ↗</a>`;
+    return;
+  }
+  el.innerHTML =
+    imgs.map((u) => `<img loading="lazy" src="${escAttr(u)}" alt="" onerror="this.remove()">`).join("") +
+    `<a class="gv-video" href="${yt}" target="_blank" rel="noopener" title="Search videos">▶<span>Videos</span></a>`;
+}
+// Lazy: only fetch a gallery's images once it scrolls near the viewport, so a
+// long list doesn't fire dozens of API calls at once.
+function hydrateGalleries(root) {
+  const els = [...root.querySelectorAll("[data-gallery]:not([data-done])")];
+  if (!("IntersectionObserver" in window)) { els.forEach(fillGallery); return; }
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach((en) => { if (en.isIntersecting) { fillGallery(en.target); obs.unobserve(en.target); } });
+  }, { root: null, rootMargin: "300px 0px" });
+  els.forEach((el) => io.observe(el));
+}
+
+/* ===== Image lightbox ===== */
+// Tap any gallery photo to open a full-screen, swipe/scroll-through viewer.
+let lbImages = [], lbIndex = 0;
+function openLightbox(images, index) {
+  lbImages = images; lbIndex = Math.max(0, Math.min(index, images.length - 1));
+  const lb = document.getElementById("lightbox");
+  const track = document.getElementById("lb-track");
+  track.innerHTML = images.map((u) => `<div class="lb-slide"><img src="${escAttr(u)}" alt=""></div>`).join("");
+  lb.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  // jump to the tapped image (no smooth scroll so it lands instantly)
+  requestAnimationFrame(() => { track.scrollTo({ left: lbIndex * track.clientWidth, behavior: "instant" }); updateLbCount(); });
+}
+function closeLightbox() {
+  document.getElementById("lightbox").classList.add("hidden");
+  document.body.style.overflow = "";
+  document.getElementById("lb-track").innerHTML = "";
+}
+function lbGo(delta) {
+  const track = document.getElementById("lb-track");
+  lbIndex = Math.max(0, Math.min(lbIndex + delta, lbImages.length - 1));
+  track.scrollTo({ left: lbIndex * track.clientWidth, behavior: "smooth" });
+  updateLbCount();
+}
+function updateLbCount() {
+  const track = document.getElementById("lb-track");
+  lbIndex = Math.round(track.scrollLeft / track.clientWidth) || 0;
+  document.getElementById("lb-count").textContent = `${lbIndex + 1} / ${lbImages.length}`;
+  document.getElementById("lb-prev").classList.toggle("hide", lbIndex === 0);
+  document.getElementById("lb-next").classList.toggle("hide", lbIndex >= lbImages.length - 1);
+}
+function initLightbox() {
+  const lb = document.getElementById("lightbox");
+  const track = document.getElementById("lb-track");
+  document.getElementById("lb-close").onclick = closeLightbox;
+  lb.querySelector(".lb-backdrop").onclick = closeLightbox;
+  document.getElementById("lb-prev").onclick = () => lbGo(-1);
+  document.getElementById("lb-next").onclick = () => lbGo(1);
+  track.addEventListener("scroll", () => { clearTimeout(track._t); track._t = setTimeout(updateLbCount, 80); });
+  document.addEventListener("keydown", (e) => {
+    if (lb.classList.contains("hidden")) return;
+    if (e.key === "Escape") closeLightbox();
+    else if (e.key === "ArrowLeft") lbGo(-1);
+    else if (e.key === "ArrowRight") lbGo(1);
+  });
+  // Delegated: any photo in any gallery opens the lightbox at that image.
+  document.addEventListener("click", (e) => {
+    const img = e.target.closest(".gallery img");
+    if (!img) return;
+    const imgs = [...img.closest(".gallery").querySelectorAll("img")].map((i) => i.src);
+    openLightbox(imgs, imgs.indexOf(img.src));
+  });
 }
 function recHtml(o, i) {
+  const city = findDay(recCtx.dayId)?.city;
+  const official = !!o.url;
   return `<div class="rec">
     <div class="name">${o.name}</div>
+    ${galleryShell(o.mapsQuery || `${o.name} ${city || ""}`)}
     <div class="row">
       ${o.rating ? `<span class="stars">${stars(o.rating)}</span>` : ""}
       ${o.area ? `<span class="pill">📍 ${o.area}</span>` : ""}
@@ -226,7 +529,11 @@ function recHtml(o, i) {
       ${o.booking ? `<span class="pill book">🎟️ ${o.booking}</span>` : ""}
     </div>
     ${o.why ? `<div class="why">${o.why}</div>` : ""}
-    <button class="add" data-add="${i}">＋ Add to ${SLOT_LABEL[recCtx.slot]}</button>
+    ${o.desc ? `<div class="desc">${o.desc}</div>` : ""}
+    <div class="rec-actions">
+      <a class="reclink" href="${recLink(o, city)}" target="_blank" rel="noopener">${official ? "Official site ↗" : "View on map ↗"}</a>
+      <button class="add" data-add="${i}">＋ Add to ${SLOT_LABEL[recCtx.slot]}</button>
+    </div>
   </div>`;
 }
 async function addRec(i) {
@@ -238,16 +545,20 @@ async function addRec(i) {
   const item = {
     id: uid(), name: o.name, type: o.type || (recMode === "food" ? "food" : "experience"),
     rating: o.rating || null, area: o.area || "", price: o.price || "",
-    notes: o.why || "", booking: o.booking || "", locked: false, lat: null, lng: null,
+    notes: o.why || "", desc: o.desc || "", booking: o.booking || "", url: o.url || recLink(o, d.city),
+    gq: o.mapsQuery || `${o.name} ${d.city}`,
+    locked: false, lat: o.lat ?? null, lng: o.lng ?? null,
   };
   block.items.push(item);
   saveTrip();
   closeSheet();
   renderDay(); renderItinerary();
-  // geocode in background so it shows on the map
-  geocode(o.mapsQuery || `${o.name} ${d.city}`).then((c) => {
-    if (c) { item.lat = c.lat; item.lng = c.lng; saveTrip(); }
-  });
+  // Coordinates are baked into SEED_RECS; only geocode if one slipped through.
+  if (item.lat == null || item.lng == null) {
+    geocode(o.mapsQuery || `${o.name} ${d.city}`).then((c) => {
+      if (c) { item.lat = c.lat; item.lng = c.lng; saveTrip(); }
+    });
+  }
 }
 
 async function geocode(q) {
@@ -293,7 +604,7 @@ function drawMap() {
   hotelCities.forEach((c) => {
     const h = trip.hotels[c];
     if (h) {
-      L.marker([h.lat, h.lng], { icon: dot("#0f172a") }).addTo(layer)
+      L.marker([h.lat, h.lng], { icon: dot("#2f2a24") }).addTo(layer)
         .bindPopup(`<b>🏨 ${h.name}</b>`);
       pts.push([h.lat, h.lng]);
     }
@@ -302,7 +613,7 @@ function drawMap() {
   days.forEach((d) => {
     d.blocks.forEach((b) => b.items.forEach((it) => {
       if (!it.lat || !it.lng) return;
-      const color = it.locked ? "#10b981" : "#6366f1";
+      const color = it.locked ? "#b15c38" : "#b8ae9c";
       L.marker([it.lat, it.lng], { icon: dot(color) }).addTo(layer)
         .bindPopup(`<b>${it.name}</b><br>${fmtDate(d.date, d.weekday)} · ${SLOT_LABEL[b.slot] || ""}` +
           `${it.rating ? `<br>★ ${it.rating}` : ""}` +
@@ -338,8 +649,8 @@ function navigateTo(it) {
         const u = [pos.coords.latitude, pos.coords.longitude];
         if (userMarker) userMarker.remove();
         if (routeLine) routeLine.remove();
-        userMarker = L.marker(u, { icon: dot("#0ea5e9") }).addTo(map).bindPopup("You are here");
-        routeLine = L.polyline([u, [it.lat, it.lng]], { color: "#0ea5e9", weight: 4, opacity: .7, dashArray: "6 8" }).addTo(map);
+        userMarker = L.marker(u, { icon: dot("#5b8aa6") }).addTo(map).bindPopup("You are here");
+        routeLine = L.polyline([u, [it.lat, it.lng]], { color: "#5b8aa6", weight: 4, opacity: .7, dashArray: "6 8" }).addTo(map);
         map.fitBounds([u, [it.lat, it.lng]], { padding: [60, 60] });
         const km = haversine(u[0], u[1], it.lat, it.lng).toFixed(1);
         L.popup().setLatLng([it.lat, it.lng])
@@ -366,7 +677,7 @@ function locateMe() {
   navigator.geolocation.getCurrentPosition((pos) => {
     const u = [pos.coords.latitude, pos.coords.longitude];
     if (userMarker) userMarker.remove();
-    userMarker = L.marker(u, { icon: dot("#0ea5e9") }).addTo(map).bindPopup("You are here").openPopup();
+    userMarker = L.marker(u, { icon: dot("#5b8aa6") }).addTo(map).bindPopup("You are here").openPopup();
     map.setView(u, 14);
   });
 }
@@ -376,7 +687,7 @@ function haversine(la1, lo1, la2, lo2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/* ===== View switching ===== */
+/* ===== View switching (pure DOM; navigation is the router's job) ===== */
 let currentView = "itinerary";
 function switchView(v) {
   currentView = v;
@@ -387,10 +698,60 @@ function switchView(v) {
   window.scrollTo(0, 0);
 }
 
+/* ===== Hash router + breadcrumbs ===== */
+// Single source of truth = location.hash. Changing the hash pushes a history
+// entry, so browser Back/Forward "just work"; route() renders whatever the hash
+// says. Hashes: "" / "itinerary" → list, "map" → map, "<dayId>" → that day.
+function navigate(hash) {
+  hash = hash || "itinerary";
+  if (location.hash.slice(1) === hash) route();   // same hash → re-render
+  else location.hash = hash;                        // else push history → hashchange → route
+}
+function route() {
+  const h = location.hash.slice(1);
+  if (h === "map") { switchView("map"); }
+  else if (h && findDay(h)) { currentDayId = h; renderDay(); switchView("day"); }
+  else { currentDayId = null; switchView("itinerary"); }
+  renderCrumbs();
+}
+function renderCrumbs() {
+  const el = document.getElementById("crumbs");
+  const crumb = (label, hash, current) =>
+    current ? `<span class="crumb current" aria-current="page">${label}</span>`
+            : `<button class="crumb" data-go="${hash}">${label}</button>`;
+  let parts = [];
+  if (currentView === "day") {
+    const d = findDay(currentDayId);
+    parts = [crumb("Itinerary", "itinerary", false),
+             crumb(d ? `${d.city === "Transit" ? "Travel" : d.city} · ${fmtDate(d.date, d.weekday)}` : "Day", "", true)];
+  } else if (currentView === "map") {
+    parts = [crumb("Itinerary", "itinerary", false), crumb("Map", "", true)];
+  } else {
+    parts = [crumb("Itinerary", "", true)];
+  }
+  el.innerHTML = parts.join('<span class="crumb-sep">›</span>');
+  el.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
+}
+
 /* ===== Init ===== */
 function renderAll() { renderHeader(); renderItinerary(); }
-document.querySelectorAll(".tab").forEach((t) => t.onclick = () => switchView(t.dataset.view));
+document.querySelectorAll(".tab").forEach((t) => t.onclick = () => navigate(t.dataset.view === "map" ? "map" : "itinerary"));
 document.getElementById("sheet-close").onclick = closeSheet;
 document.querySelector(".sheet-backdrop").onclick = closeSheet;
+initLightbox();
+document.getElementById("view-day").addEventListener("pointerdown", onDragDown);
+// Left/right arrows page between days (when in a day view and no lightbox open).
+document.addEventListener("keydown", (e) => {
+  if (currentView !== "day") return;
+  if (!document.getElementById("lightbox").classList.contains("hidden")) return;
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  let list = filteredDays();
+  if (!list.some((x) => x.id === currentDayId)) list = trip.days;
+  const pos = list.findIndex((x) => x.id === currentDayId);
+  const target = e.key === "ArrowLeft" ? list[pos - 1] : list[pos + 1];
+  if (target) { e.preventDefault(); navigate(target.id); }
+});
 trip.days.forEach(ensureIds); saveTrip();
 renderAll();
+window.addEventListener("hashchange", route);
+route();   // honour any deep-link hash on load

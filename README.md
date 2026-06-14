@@ -1,33 +1,33 @@
 # Asia Trip 2026 — Planner
 
-Mobile-first trip planner for the June–July 2026 Tokyo → Osaka → Seoul → Beijing trip.
+Mobile-first, **fully static** trip planner for the June–July 2026 Tokyo → Osaka → Seoul → Beijing trip.
+No build step, no server, no API keys — runs straight from `public/` and deploys to GitHub Pages.
 
 ## What it does
-- **Itinerary view** — day cards by city; tap a day to open it.
-- **Day blocks** — Morning / Midday / Afternoon / Evening. Lock in the plans you've committed to, add or delete others.
-- **✨ Recommend options** — live AI research (Anthropic + web search) suggests activities or restaurants for that slot, aware of what you've already locked in and your hotel location. Tap **＋ Add** to drop one into the day.
-- **Embedded map** — Leaflet/OpenStreetMap (no API key) with pins for hotels and stops. Green = locked, purple = tentative.
-- **Directions** — uses your phone's location to draw the route and distance, with a one-tap "open turn-by-turn" hand-off to Google Maps (transit mode).
-- **Saves on-device** — everything persists in your browser (localStorage). Use **↺ Reset** to restore the original plan.
+- **Itinerary view** — day cards by city; tap a day to open it. Filter by city from the top chips.
+- **Calendar day view** — a timeline with real times; drag activities (⠿ handle) between time blocks, set exact times, lock in plans, and page **Previous / Next day**.
+- **Flights & airport buffers** — real flight legs (times, terminals, seats, confirmations) sit on the calendar, each preceded by a 🧳 checkout + travel-to-airport block.
+- **🚇 Getting around** — a per-city transit primer (how the subway works, how to get a Suica/ICOCA/T-money/transit-QR pass), plus a **Transit from <previous stop>** directions link on each activity.
+- **✨ Suggest** — curated, pre-researched activity & restaurant picks per city (family of 5, kids 12/10/7), each with a description, **official/booking & map links**, and a **scrollable photo gallery** (tap a photo for a full-screen swipe-through lightbox).
+- **🎟️ Booking links** — reservation/ticket notes ("Reserve seats", "Ticket at door/online", …) link straight out to book.
+- **Map** — Leaflet/OpenStreetMap (no key); clay pins = locked, taupe = tentative, ink = hotels. Directions hand off to Google Maps (transit).
+- **Installable** — add to your phone's home screen (PWA manifest) for a full-screen app. Saves on-device (localStorage); **↺ Reset** restores the original plan.
 
 ## Run locally
+It's static — open `public/index.html` directly, or serve the folder any way you like:
 ```bash
 cd trip-planner
-npm install
-cp .env.example .env      # then paste your ANTHROPIC_API_KEY
-npm start                 # http://localhost:8080
+python3 -m http.server -d public 8080   # → http://localhost:8080
+# or: npm start   (the included zero-dependency Node server in server.js)
 ```
-Without a key the app runs fine — only the live "Recommend options" needs it (it shows a note explaining how to enable it).
+No install, no API key. To refresh the curated picks, open the project in Claude Code and ask it to "refresh the recommendations."
 
-## Deploy to fly.io (later)
-```bash
-fly launch --no-deploy        # accepts the included fly.toml
-fly secrets set ANTHROPIC_API_KEY=sk-ant-...
-fly deploy
-```
-`primary_region` is set to `nrt` (Tokyo). The app listens on `PORT` (8080).
+## Deploy (GitHub Pages)
+Already wired: `.github/workflows/pages.yml` publishes `public/` to Pages on every push to `main`.
+One-time: in the repo, **Settings → Pages → Source: GitHub Actions**. Site goes live at
+`https://<user>.github.io/family-trip-planner/`.
 
 ## Notes
-- Recommendation engine: `POST /api/recommend` in `server.js`, model configurable via `ANTHROPIC_MODEL` (default `claude-sonnet-4-6`).
-- Seed itinerary + coordinates live in `public/data.js`.
-- Geocoding of AI-added stops uses the free Nominatim service.
+- Images load live (embedded, not downloaded) from **Openverse** (keyless) and cache to localStorage.
+- Seed itinerary, flights and the transit primer live in `public/data.js`; curated recs in `public/recommendations.js`.
+- `server.js` (+ its legacy `POST /api/recommend`) is only for optional local dev — the deployed app is 100% static.

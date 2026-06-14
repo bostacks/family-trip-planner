@@ -6,6 +6,26 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(__dirname, "public");
 
+// Minimal .env loader (no dependencies). Lines like KEY=value; existing
+// process.env wins so inline `KEY=... node server.js` still overrides the file.
+function loadEnv(file = path.join(__dirname, ".env")) {
+  let raw;
+  try { raw = fs.readFileSync(file, "utf8"); } catch { return; }
+  for (let line of raw.split("\n")) {
+    line = line.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (key && !(key in process.env)) process.env[key] = val;
+  }
+}
+loadEnv();
+
 const PORT = process.env.PORT || 8080;
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;

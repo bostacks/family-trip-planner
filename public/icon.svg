@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Asia Trip">
+  <rect width="512" height="512" rx="116" fill="#f4f0e8"/>
+  <path d="M92 252 L430 100 L342 432 Z" fill="#b15c38"/>
+  <path d="M342 432 L298 298 L430 100 Z" fill="#8f4429"/>
+  <circle cx="256" cy="256" r="0" fill="none"/>
+</svg>
