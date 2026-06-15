@@ -180,8 +180,9 @@ button { font-family: inherit; }
 
 /* "Make day efficient" button + toast */
 .day-tools { margin-bottom: 18px; }
-.opt-btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 650; cursor: pointer; }
+.opt-btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 650; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .opt-btn:active { filter: brightness(.94); }
+.opt-ico { width: 18px; height: 18px; flex: 0 0 auto; }
 .toast {
   position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 80px); transform: translateX(-50%) translateY(8px);
   background: var(--ink); color: var(--paper); padding: 11px 17px; border-radius: 999px; font-size: 13px; font-weight: 600;
@@ -255,6 +256,10 @@ button { font-family: inherit; }
   cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; padding: 2px 2px 6px; letter-spacing: -2px;
 }
 .ev-drag:active { cursor: grabbing; }
+.ev-move { display: inline-flex; gap: 3px; flex: 0 0 auto; align-self: flex-start; margin-top: -1px; }
+.ev-move-btn { width: 25px; height: 25px; padding: 0; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 7px; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; font-weight: 700; }
+.ev-move-btn:active { background: var(--surface-2); }
+.ev-move-btn:disabled { opacity: .28; cursor: default; }
 .cal-ev.dragging { opacity: .35; }
 .drag-ghost {
   position: fixed; z-index: 90; pointer-events: none; opacity: .96; margin: 0;

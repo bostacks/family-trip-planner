@@ -30,7 +30,7 @@ function resetTrip() {
 /* ===== Helpers ===== */
 const SLOTS = ["morning", "lunch", "afternoon", "evening"];
 const SLOT_LABEL = { morning: "Morning", lunch: "Midday", afternoon: "Afternoon", evening: "Evening" };
-const SLOT_HINT = { morning: "from 09:00", lunch: "from 12:00", afternoon: "from 14:00", evening: "from 18:00" };
+const SLOT_HINT = { morning: "from 9:00 AM", lunch: "from 12:00 PM", afternoon: "from 2:00 PM", evening: "from 6:00 PM" };
 const SLOT_BASE = { morning: 9 * 60, lunch: 12 * 60, afternoon: 14 * 60, evening: 18 * 60 };
 const DUR_BY_TYPE = { experience: 180, sight: 120, museum: 120, park: 90, food: 75, shopping: 90, transit: 120 };
 const uid = () => "x" + Math.random().toString(36).slice(2, 9);
@@ -39,13 +39,19 @@ const fmtKm = (km) => (km >= 10 ? Math.round(km) : km < 1 ? km.toFixed(1) : km.t
 const itemDur = (it) => it.dur || DUR_BY_TYPE[it.type] || 90;
 function fmtHM(min) {
   min = ((min % 1440) + 1440) % 1440;
-  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  const h = Math.floor(min / 60), m = min % 60;
+  const ap = h < 12 ? "AM" : "PM";
+  const hh = (h % 12) || 12;
+  return `${hh}:${String(m).padStart(2, "0")} ${ap}`;
 }
+// Accepts 24h ("14:30") or 12h ("2:30 PM").
 function parseHM(s) {
-  const m = /^(\d{1,2}):?(\d{2})$/.exec((s || "").trim());
+  const m = /^(\d{1,2}):?(\d{2})\s*(am|pm)?$/i.exec((s || "").trim());
   if (!m) return null;
-  const h = +m[1], mi = +m[2];
-  if (h > 23 || mi > 59) return null;
+  let h = +m[1]; const mi = +m[2], ap = m[3] && m[3].toLowerCase();
+  if (mi > 59) return null;
+  if (ap) { if (h < 1 || h > 12) return null; if (ap === "pm" && h !== 12) h += 12; if (ap === "am" && h === 12) h = 0; }
+  else if (h > 23) return null;
   return h * 60 + mi;
 }
 // Lay items out on a timeline. Honours an explicit it.start; otherwise flows
@@ -187,10 +193,15 @@ function renderDay() {
       : (hotel ? { name: hotel.name, lat: hotel.lat, lng: hotel.lng } : null);
   });
 
+  // Order of movable (non-transit) stops, for enabling the move up/down buttons.
+  const navIds = sched.filter((x) => x.it.type !== "transit").map((x) => x.it.id);
   // Calendar: one section per part-of-day, each a timeline of timed events.
   const body = SLOTS.map((slot) => {
     const rows = sched.filter((s) => s.slot === slot);
-    const events = rows.map((s) => calEvent(d, s, prevOf[s.it.id])).join("");
+    const events = rows.map((s) => {
+      const ni = navIds.indexOf(s.it.id);
+      return calEvent(d, s, prevOf[s.it.id], ni > 0, ni >= 0 && ni < navIds.length - 1);
+    }).join("");
     const suggest = isTransit ? "" : `<button class="suggest" data-rec="${slot}">✨ Suggest</button>`;
     const empty = rows.length ? "" : `<button class="cal-empty" data-rec="${slot}">＋ Add something to the ${SLOT_LABEL[slot].toLowerCase()}</button>`;
     return `<section class="cal-slot">
@@ -226,13 +237,16 @@ function transitUrl(prev, it) {
   return `https://www.google.com/maps/dir/?api=1&origin=${prev.lat},${prev.lng}&destination=${it.lat},${it.lng}&travelmode=transit`;
 }
 // One timed event on the calendar: a time rail on the left + a card.
-function calEvent(d, s, prev) {
+function calEvent(d, s, prev, canUp, canDown) {
   const it = s.it;
   const meta = [it.area ? `📍 ${it.area}` : "", it.price || "", it.rating ? stars(it.rating) : ""]
     .filter(Boolean).map((x) => `<span>${x}</span>`).join("");
   const a = (act, label, cls = "") =>
     `<button class="ev-act ${cls}" data-act="${act}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}">${label}</button>`;
+  const mv = (act, label, on) =>
+    `<button class="ev-move-btn" data-act="${act}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}" aria-label="Move ${act}"${on ? "" : " disabled"}>${label}</button>`;
   const draggable = it.type !== "transit";
+  const reorder = draggable ? `<span class="ev-move">${mv("up", "↑", canUp)}${mv("down", "↓", canDown)}</span>` : "";
   const book = bookingLink(it, d.city);
   const fromName = prev ? prev.name.replace(/\s*\(.*$/, "").trim() : "";
   const fromShort = fromName.length > 26 ? fromName.slice(0, 24) + "…" : fromName;
@@ -243,6 +257,7 @@ function calEvent(d, s, prev) {
       <div class="ev-top">
         ${draggable ? `<span class="ev-drag" title="Drag to move">⠿</span>` : ""}
         <span class="ev-name">${it.name}</span>${it.type ? `<span class="ev-tag">${it.type}</span>` : ""}
+        ${reorder}
       </div>
       ${it.type === "transit" ? "" : galleryShell(it.gq || it.mapsQuery || `${it.name} ${d.city}`)}
       ${showTransit ? `<a class="ev-transit" href="${transitUrl(prev, it)}" target="_blank" rel="noopener">🚇 Transit from ${fromShort} ↗</a>` : ""}
@@ -481,7 +496,8 @@ function optimiseBar(d) {
   if (d.city === "Transit") return "";
   const n = d.blocks.flatMap((b) => b.items).filter((it) => it.type !== "transit" && it.lat != null && it.lng != null).length;
   if (n < 3 || !trip.hotels[d.city]) return "";
-  return `<div class="day-tools"><button id="opt-btn" class="opt-btn">🧭 Make day efficient</button></div>`;
+  const ico = `<svg class="opt-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18 L10 8 L20 13"/><circle cx="4" cy="18" r="1.7" fill="currentColor" stroke="none"/><circle cx="10" cy="8" r="1.7" fill="currentColor" stroke="none"/><circle cx="20" cy="13" r="1.7" fill="currentColor" stroke="none"/></svg>`;
+  return `<div class="day-tools"><button id="opt-btn" class="opt-btn">${ico}<span>Make day efficient</span></button></div>`;
 }
 let toastT = null;
 function toast(msg) {
@@ -570,16 +586,35 @@ function itemAction(act, dayId, slot, itemId) {
   if (act === "lock") { it.locked = !it.locked; saveTrip(); renderDay(); renderItinerary(); }
   else if (act === "del") { block.items = block.items.filter((x) => x.id !== itemId); saveTrip(); renderDay(); renderItinerary(); }
   else if (act === "go") { navigateTo(it); }
+  else if (act === "up") { moveItemDir(dayId, itemId, -1); }
+  else if (act === "down") { moveItemDir(dayId, itemId, +1); }
   else if (act === "time") {
     const cur = typeof it.start === "number" ? fmtHM(it.start) : "";
-    const input = prompt(`Start time for “${it.name}” (24h, e.g. 09:30):`, cur);
+    const input = prompt(`Start time for “${it.name}” (e.g. 9:30 AM):`, cur);
     if (input === null) return;
     const mins = parseHM(input);
     if (input.trim() === "") { delete it.start; }
-    else if (mins == null) { alert("Please enter a time like 09:30."); return; }
+    else if (mins == null) { alert("Please enter a time like 9:30 AM."); return; }
     else { it.start = mins; }
     saveTrip(); renderDay();
   }
+}
+// Move an item one position earlier/later in the day's sequence (skips flights);
+// the slot/time reflows to its new position. Helps reordering on mobile.
+function moveItemDir(dayId, itemId, dir) {
+  const d = findDay(dayId);
+  const seq = [];
+  SLOTS.forEach((s) => { const b = d.blocks.find((x) => x.slot === s); if (b) b.items.forEach((it) => seq.push({ slot: s, it })); });
+  const i = seq.findIndex((x) => x.it.id === itemId);
+  if (i < 0) return;
+  let j = i + dir;
+  while (j >= 0 && j < seq.length && seq[j].it.type === "transit") j += dir;
+  if (j < 0 || j >= seq.length) return;
+  const a = seq[i].it; seq[i].it = seq[j].it; seq[j].it = a; // swap items, slots stay with positions
+  const map = {};
+  seq.forEach((x) => { (map[x.slot] = map[x.slot] || []).push(x.it); });
+  d.blocks = SLOTS.filter((s) => map[s] && map[s].length).map((s) => ({ slot: s, items: map[s] }));
+  saveTrip(); renderDay(); renderItinerary();
 }
 
 /* ===== Recommend sheet (live AI) ===== */
