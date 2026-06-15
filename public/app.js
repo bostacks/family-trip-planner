@@ -6,6 +6,7 @@ let currentDayId = null;
 let recCtx = null; // { dayId, slot }
 let recMode = "todo"; // 'todo' | 'food'
 let recQuery = ""; // suggestion search text
+let recSort = "stops"; // distance-sort reference: 'stops' | 'hotel' | 'me'
 
 function loadTrip() {
   try {
@@ -206,6 +207,8 @@ function renderDay() {
   el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
+  const hideBtn = el.querySelector("#rm-hide"); if (hideBtn) hideBtn.onclick = () => setMapHidden(true);
+  const showBtn = el.querySelector("#rm-show"); if (showBtn) showBtn.onclick = () => setMapHidden(false);
   renderDayMap(d);
   hydrateGalleries(el);
 }
@@ -264,17 +267,22 @@ function ensureIds(day) {
 
 // Container for the day's reference map (a real city map with the hotel + the
 // day's stops). Filled in by renderDayMap() after the day view is in the DOM.
+const MAPH_LS = "asia-trip-daymap-hidden";
+let mapHidden = (() => { try { return localStorage.getItem(MAPH_LS) === "1"; } catch { return false; } })();
+function setMapHidden(v) { mapHidden = v; try { localStorage.setItem(MAPH_LS, v ? "1" : "0"); } catch {} renderDay(); }
 function dayRouteMap(d) {
   if (d.city === "Transit") return "";
   const hotel = trip.hotels[d.city];
   const anyCoord = hotel || computeSchedule(d).some((s) => s.it.type !== "transit" && s.it.lat != null);
   if (!anyCoord) return "";
+  if (mapHidden) return `<button class="daymap-show" id="rm-show">🗺 Show day map</button>`;
   return `<div class="routemap">
     <div class="routemap-head">
       <span class="routemap-title">Day map</span>
       <div class="routemap-actions">
         <span class="routemap-total" id="rm-total"></span>
         <button class="routemap-toggle" id="rm-toggle">Hide route</button>
+        <button class="routemap-close" id="rm-hide" title="Hide day map" aria-label="Hide day map">✕</button>
       </div>
     </div>
     <div id="day-map" class="day-map"></div>
@@ -286,9 +294,10 @@ function dayRouteMap(d) {
 // hotel always marked, and the day's stops + connecting route as a toggleable
 // overlay. Non-interactive so it never traps the page scroll. Rebuilt each
 // renderDay(), so it tracks plan changes.
-let dayMap = null, dayRouteLayer = null, routeHidden = false;
+let dayMap = null, dayRouteLayer = null, routeHidden = false, dayUserMarker = null, userLoc = null;
+const dmMeIcon = () => L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [9, 9], html: `<div class="dm-me"></div>` });
 const dmHotelIcon = () => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-hotel">⌂</div>` });
-const dmNumIcon = (n, kind) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-num ${kind === "locked" ? "lock" : "tent"}">${n}</div>` });
+const dmNumIcon = (n, kind, food) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-num ${kind === "locked" ? "lock" : "tent"}${food ? " food" : ""}">${n}${food ? `<span class="dm-food">🍴</span>` : ""}</div>` });
 const dmDistIcon = (t) => L.divIcon({ className: "", iconSize: [0, 0], iconAnchor: [0, 0], html: `<div class="dm-dist">${t}</div>` });
 const dmLandIcon = (name) => L.divIcon({ className: "", iconSize: [0, 0], iconAnchor: [4, 4], html: `<div class="dm-land"><span class="dm-land-dot"></span><span class="dm-land-lbl">${escAttr(name)}</span></div>` });
 function renderDayMap(d) {
@@ -302,7 +311,7 @@ function renderDayMap(d) {
   computeSchedule(d).forEach((s) => {
     const it = s.it;
     if (it.type === "transit" || it.lat == null || it.lng == null) return;
-    stops.push({ lat: it.lat, lng: it.lng, kind: it.locked ? "locked" : "tent", name: it.name });
+    stops.push({ lat: it.lat, lng: it.lng, kind: it.locked ? "locked" : "tent", name: it.name, food: it.type === "food" });
   });
   const places = stops.filter((s) => s.kind !== "hotel");
 
@@ -313,7 +322,8 @@ function renderDayMap(d) {
   const map = L.map(el, { zoomControl: true, boxZoom: false, dragging: !touch, tap: false, touchZoom: true, doubleClickZoom: true, scrollWheelZoom: true });
   dayMap = map;
   if (touch) el.style.touchAction = "pan-y";
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", {
+  // Voyager: cream/paper land, visible roads + highways, blue water, green parks.
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", {
     subdomains: "abcd", maxZoom: 19, attribution: "© OpenStreetMap, © CARTO",
   }).addTo(map);
   // Major-landmark reference markers (always visible, non-interactive).
@@ -331,13 +341,13 @@ function renderDayMap(d) {
       L.marker([(stops[i - 1].lat + stops[i].lat) / 2, (stops[i - 1].lng + stops[i].lng) / 2], { icon: dmDistIcon(fmtKm(km)) }).addTo(dayRouteLayer);
     }
   }
-  places.forEach((s, i) => L.marker([s.lat, s.lng], { icon: dmNumIcon(i + 1, s.kind) }).addTo(dayRouteLayer).bindPopup(`${i + 1}. ${s.name}`));
+  places.forEach((s, i) => L.marker([s.lat, s.lng], { icon: dmNumIcon(i + 1, s.kind, s.food) }).addTo(dayRouteLayer).bindPopup(`${i + 1}. ${s.food ? "🍴 " : ""}${s.name}`));
   if (!routeHidden) dayRouteLayer.addTo(map);
 
   const totalEl = document.getElementById("rm-total");
   if (totalEl) totalEl.textContent = places.length ? `≈ ${fmtKm(total)} · ${places.length} stop${places.length === 1 ? "" : "s"}` : "";
   const foot = document.getElementById("rm-foot");
-  if (foot) foot.textContent = places.length ? "Numbered in visiting order · tighter clusters mean less travel" : "Your hotel is marked — add stops to see the route.";
+  if (foot) foot.textContent = places.length ? "Numbered in visiting order · 🍴 = meal stop · tighter clusters mean less travel" : "Your hotel is marked — add stops to see the route.";
   const tgl = document.getElementById("rm-toggle");
   if (tgl) {
     tgl.disabled = places.length === 0;
@@ -348,6 +358,40 @@ function renderDayMap(d) {
       tgl.textContent = routeHidden ? "Show route" : "Hide route";
     };
   }
+
+  // "My location" control — drops a live pin so you can see where you are
+  // relative to the route (asks for browser permission on first use).
+  const addMe = () => {
+    if (dayUserMarker) { try { dayUserMarker.remove(); } catch {} dayUserMarker = null; }
+    if (userLoc) dayUserMarker = L.marker([userLoc.lat, userLoc.lng], { icon: dmMeIcon(), zIndexOffset: 1000 }).addTo(map).bindPopup("You are here");
+  };
+  const locate = () => {
+    if (!navigator.geolocation) { alert("Location isn't available in this browser."); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        addMe();
+        const pts = line.concat([[userLoc.lat, userLoc.lng]]);
+        if (hotel) pts.push([hotel.lat, hotel.lng]);
+        map.fitBounds(pts, { padding: [30, 30], maxZoom: 16 });
+        if (currentView === "day") updateRecResults && document.getElementById("rec-results") && updateRecResults();
+      },
+      () => alert("Couldn't get your location. Make sure location access is allowed for this site."),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+  const Locate = L.Control.extend({
+    options: { position: "topright" },
+    onAdd() {
+      const b = L.DomUtil.create("button", "dm-locate");
+      b.type = "button"; b.innerHTML = "📍"; b.title = "Show my location";
+      L.DomEvent.on(b, "click", (ev) => { L.DomEvent.stop(ev); locate(); });
+      L.DomEvent.disableClickPropagation(b);
+      return b;
+    },
+  });
+  map.addControl(new Locate());
+  if (userLoc) addMe();
 
   // Fit after the container is visible & sized.
   const fit = () => {
@@ -455,6 +499,8 @@ function openRecommend(dayId, slot) {
   recCtx = { dayId, slot };
   recMode = slot === "lunch" ? "food" : "todo";
   recQuery = "";
+  // Default the sort reference: earlier stops if there are any, else the hotel.
+  recSort = hasPriorStops(findDay(dayId), slot) ? "stops" : "hotel";
   document.getElementById("sheet").classList.remove("hidden");
   document.getElementById("sheet-title").textContent = `${SLOT_LABEL[slot]} ideas`;
   buildSheet();
@@ -475,6 +521,14 @@ function buildSheet() {
       <button class="${recMode === "todo" ? "active" : ""}" data-mode="todo">Things to do</button>
       <button class="${recMode === "food" ? "active" : ""}" data-mode="food">Restaurants</button>
     </div>
+    <div class="rec-sort">
+      <span class="rec-sort-lbl">Nearest to</span>
+      <div class="rec-sort-btns">
+        <button data-sort="stops">Earlier stops</button>
+        <button data-sort="hotel">Hotel</button>
+        <button data-sort="me">My location</button>
+      </div>
+    </div>
     <div id="rec-results"></div>`;
   const q = bodyEl.querySelector("#rec-q");
   q.oninput = () => { recQuery = q.value; updateRecResults(); };
@@ -483,8 +537,27 @@ function buildSheet() {
     bodyEl.querySelectorAll("[data-mode]").forEach((x) => x.classList.toggle("active", x.dataset.mode === recMode));
     updateRecResults();
   });
+  bodyEl.querySelectorAll("[data-sort]").forEach((b) => b.onclick = () => {
+    const v = b.dataset.sort;
+    if (v === "me") { ensureUserLoc((ok) => { if (ok) { recSort = "me"; } syncSortButtons(); updateRecResults(); }); return; }
+    recSort = v; syncSortButtons(); updateRecResults();
+  });
+  syncSortButtons();
   updateRecResults();
   if (recQuery) q.focus();
+}
+function syncSortButtons() {
+  document.querySelectorAll(".rec-sort [data-sort]").forEach((x) => x.classList.toggle("active", x.dataset.sort === recSort));
+}
+// Get the browser location once (shared with the day map's pin), then call back.
+function ensureUserLoc(cb) {
+  if (userLoc) { cb(true); return; }
+  if (!navigator.geolocation) { alert("Location isn't available in this browser."); cb(false); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { userLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; cb(true); },
+    () => { alert("Couldn't get your location. Make sure location access is allowed for this site."); cb(false); },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
 }
 
 // Recommendations come from the baked-in SEED_RECS (no API key). With a search
@@ -512,9 +585,9 @@ function updateRecResults() {
       return terms.every((t) => hay.includes(t));
     });
   }
-  // Distance sort: order by proximity to what's already planned in earlier slots
-  // this day (or the hotel if nothing yet). Options with coords come first.
-  const ref = dayReferencePoints(d, recCtx.slot);
+  // Distance sort: order by proximity to the chosen reference (earlier stops /
+  // hotel / your location). Options with coords come first.
+  const ref = refPointsForSort(d, recCtx.slot, recSort);
   const ranked = options.map((o) => {
     let dist = null;
     if (o.lat != null && o.lng != null && ref.pts.length) {
@@ -538,18 +611,25 @@ function updateRecResults() {
   resultsEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
   hydrateGalleries(resultsEl);
 }
-// Reference points for distance sorting: locations already chosen in EARLIER
-// slots of this day; falls back to the city's hotel.
-function dayReferencePoints(d, slot) {
+function priorStops(d, slot) {
   const idx = SLOTS.indexOf(slot);
   const pts = [];
   d.blocks.forEach((b) => {
     if (SLOTS.indexOf(b.slot) >= idx) return;
     b.items.forEach((it) => { if (it.lat != null && it.lng != null && it.type !== "transit") pts.push({ lat: it.lat, lng: it.lng }); });
   });
-  if (pts.length) return { pts, label: "your earlier stops" };
-  const h = trip.hotels[d.city];
-  if (h) return { pts: [{ lat: h.lat, lng: h.lng }], label: "your hotel" };
+  return pts;
+}
+const hasPriorStops = (d, slot) => priorStops(d, slot).length > 0;
+// Reference points for the chosen sort mode (with sensible fallbacks).
+function refPointsForSort(d, slot, mode) {
+  const hotel = trip.hotels[d.city];
+  if (mode === "me" && userLoc) return { pts: [{ lat: userLoc.lat, lng: userLoc.lng }], label: "your location" };
+  if (mode === "stops") {
+    const pts = priorStops(d, slot);
+    if (pts.length) return { pts, label: "your earlier stops" };
+  }
+  if (hotel) return { pts: [{ lat: hotel.lat, lng: hotel.lng }], label: "your hotel" };
   return { pts: [], label: "" };
 }
 // Outbound link: prefer a curated official/booking URL, else a Google Maps
