@@ -6,6 +6,8 @@
  * ========================================================================== */
 window.SEED_RECS_EXTRA3 = {
   Tokyo: { todo: [
+    { name: "Imperial Palace East Gardens", type: "park", area: "Chiyoda", price: "free", rating: 4.4, booking: "Free walk-in", lat: 35.6852, lng: 139.7528, mapsQuery: "Imperial Palace East Gardens Tokyo", why: "Free castle-ruin gardens at the city's green heart (closed Mon/Fri)." },
+    { name: "Imperial Palace & Nijubashi Bridge", type: "sight", area: "Chiyoda", price: "free", rating: 4.4, booking: "Free (plaza)", lat: 35.6797, lng: 139.7536, mapsQuery: "Nijubashi Imperial Palace Tokyo", why: "The classic double-bridge palace view from the outer plaza." },
     { name: "Tokyo National Museum", type: "museum", area: "Ueno", price: "$", rating: 4.6, booking: "Ticket on site", mapsQuery: "Tokyo National Museum Ueno", why: "Japan's largest collection of art and samurai treasures." },
     { name: "National Museum of Nature & Science", type: "museum", area: "Ueno", price: "$", rating: 4.5, booking: "Ticket on site", mapsQuery: "National Museum of Nature and Science Tokyo", why: "Dinosaurs and a 360° theatre — a kids' favourite in Ueno Park." },
     { name: "National Museum of Western Art", type: "museum", area: "Ueno", price: "$", rating: 4.4, booking: "Ticket on site", mapsQuery: "National Museum of Western Art Tokyo", why: "Le Corbusier-designed gallery with Monet and Rodin." },
