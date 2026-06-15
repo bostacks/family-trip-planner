@@ -50,7 +50,7 @@ const DUR_BY_TYPE = { experience: 180, sight: 120, museum: 120, park: 90, food: 
 const uid = () => "x" + Math.random().toString(36).slice(2, 9);
 const stars = (r) => (r ? "★ " + Number(r).toFixed(1) : "");
 const fmtKm = (km) => (km >= 10 ? Math.round(km) : km < 1 ? km.toFixed(1) : km.toFixed(1)) + " km";
-const itemDur = (it) => it.dur || DUR_BY_TYPE[it.type] || 90;
+const itemDur = (it) => it.dur || 60; // events default to 1-hour chunks (flights keep their own dur)
 function fmtHM(min) {
   min = ((min % 1440) + 1440) % 1440;
   const h = Math.floor(min / 60), m = min % 60;
@@ -218,7 +218,7 @@ function renderDay() {
       const ni = navIds.indexOf(s.it.id);
       return calEvent(d, s, prevOf[s.it.id], ni > 0, ni >= 0 && ni < navIds.length - 1);
     }).join("");
-    const suggest = isTransit ? "" : `<button class="suggest" data-rec="${slot}">✨ Suggest</button>`;
+    const suggest = isTransit ? "" : `<div class="slot-actions"><button class="slot-add" data-add-slot="${slot}">＋ Add</button><button class="suggest" data-rec="${slot}">✨ Suggest</button></div>`;
     const empty = rows.length ? "" : `<button class="cal-empty" data-rec="${slot}">＋ Add something to the ${SLOT_LABEL[slot].toLowerCase()}</button>`;
     return `<section class="cal-slot">
       <div class="cal-slot-head">
@@ -233,6 +233,7 @@ function renderDay() {
   el.querySelector(".back").onclick = () => (history.length > 1 ? history.back() : navigate("itinerary"));
   el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
+  el.querySelectorAll("[data-add-slot]").forEach((b) => b.onclick = () => addCustomEvent(d.id, b.dataset.addSlot));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
   el.querySelectorAll(".ev-collapse").forEach((b) => b.onclick = () => toggleCollapse(b));
   const caBtn = el.querySelector("#collapse-all"); if (caBtn) { caBtn.onclick = collapseAll; updateCollapseAllLabel(); }
@@ -745,7 +746,7 @@ function updateRecResults() {
   if (toolbar) toolbar.style.display = query ? "none" : "";
   const already = new Set(d.blocks.flatMap((b) => b.items).map((i) => (i.name || "").toLowerCase()));
   let pool = query ? [...city.todo, ...city.food] : (recMode === "food" ? city.food : city.todo);
-  let options = pool.filter((o) => !already.has((o.name || "").toLowerCase()));
+  let options = pool.slice(); // show ALL suggestions (added ones are marked, not hidden)
   if (terms.length) {
     options = options.filter((o) => {
       const hay = `${o.name} ${o.area || ""} ${o.type || ""} ${o.why || ""} ${o.desc || ""}`.toLowerCase();
@@ -771,8 +772,8 @@ function updateRecResults() {
     inner += `<div class="rec-sortnote">↕ Sorted by distance from ${ref.label}</div>`;
   }
   inner += ranked.length
-    ? ranked.map((x, i) => recHtml(x.o, i, x.dist)).join("")
-    : `<div class="empty">${query ? "No places match your search." : "Nothing left to suggest here."}</div>`;
+    ? ranked.map((x, i) => recHtml(x.o, i, x.dist, already.has((x.o.name || "").toLowerCase()))).join("")
+    : `<div class="empty">${query ? "No places match your search." : "Nothing to suggest here."}</div>`;
   resultsEl.innerHTML = inner;
   window.__recs = ranked.map((x) => x.o);
   resultsEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
@@ -988,11 +989,11 @@ function initPullToRefresh() {
   document.addEventListener("touchend", end);
   document.addEventListener("touchcancel", end);
 }
-function recHtml(o, i, dist) {
+function recHtml(o, i, dist, added) {
   const city = findDay(recCtx.dayId)?.city;
   const official = !!o.url;
   return `<div class="rec">
-    <div class="name">${o.name}</div>
+    <div class="name">${o.name}${added ? ` <span class="rec-added">✓ Added</span>` : ""}</div>
     ${galleryShell(o.mapsQuery || `${o.name} ${city || ""}`)}
     <div class="row">
       ${dist != null ? `<span class="pill dist">📍 ${fmtKm(dist)}</span>` : ""}
@@ -1009,6 +1010,46 @@ function recHtml(o, i, dist) {
       <button class="add" data-add="${i}">＋ Add to ${SLOT_LABEL[recCtx.slot]}</button>
     </div>
   </div>`;
+}
+// Pull a name + coordinates out of a pasted Google Maps URL (best-effort; full
+// /maps/place/... links carry coords, short maps.app.goo.gl links don't).
+function parseGoogleMapsUrl(s) {
+  if (!/^https?:\/\//i.test(s) || !/google\.[^/]+\/maps|maps\.app\.goo\.gl|maps\.google|goo\.gl\/maps/i.test(s)) return null;
+  let name = "", lat = null, lng = null;
+  const pm = s.match(/\/place\/([^/@?]+)/);
+  if (pm) name = decodeURIComponent(pm[1].replace(/\+/g, " ")).trim();
+  const cm = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || s.match(/[?&](?:q|query|ll|center)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (cm) { lat = +cm[1]; lng = +cm[2]; }
+  if (!name) {
+    const qm = s.match(/[?&](?:q|query)=([^&]+)/);
+    if (qm) { const v = decodeURIComponent(qm[1].replace(/\+/g, " ")); if (!/^-?\d+\.\d+\s*,/.test(v)) name = v.trim(); }
+  }
+  return { name, lat, lng, url: s, readable: !!(name || lat != null) };
+}
+// Add a custom (your-own) event to a part-of-day as a 1-hour chunk. You can type
+// a name OR paste a Google Maps link — we pull the place name/coords from it and
+// store it like a suggestion (with a map link + photo gallery). Geocodes by name
+// if the link/name has no coordinates.
+function addCustomEvent(dayId, slot) {
+  const input = (prompt(`Add to the ${SLOT_LABEL[slot]} — type a place, or paste a Google Maps link:`) || "").trim();
+  if (!input) return;
+  const isUrl = /^https?:\/\//i.test(input);
+  const g = parseGoogleMapsUrl(input);
+  if (isUrl && (!g || !g.readable)) {
+    alert("Couldn't read that link. Open the place in Google Maps and paste the full URL from the address bar — short links like maps.app.goo.gl can't be read.");
+    return;
+  }
+  const d = findDay(dayId);
+  let block = d.blocks.find((b) => b.slot === slot);
+  if (!block) { block = { slot, items: [] }; d.blocks.push(block); }
+  const item = (g && g.readable)
+    ? { id: uid(), name: g.name || "Pinned location", type: "", rating: null, area: "", price: "", notes: "", booking: "", url: g.url, gq: g.name || "", locked: false, lat: g.lat, lng: g.lng }
+    : { id: uid(), name: input, type: "", rating: null, area: "", price: "", notes: "", booking: "", locked: false, lat: null, lng: null };
+  block.items.push(item);
+  saveTrip(); renderDay(); renderItinerary();
+  if (item.lat == null) {
+    geocode(g ? g.name : `${item.name} ${d.city}`).then((c) => { if (c) { item.lat = c.lat; item.lng = c.lng; saveTrip(); renderDay(); } });
+  }
 }
 async function addRec(i) {
   const o = window.__recs[i];

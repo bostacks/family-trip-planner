@@ -220,6 +220,10 @@ button { font-family: inherit; }
   border-radius: 999px; padding: 6px 13px; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s;
 }
 .suggest:active { background: var(--accent-soft); }
+.slot-actions { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
+.slot-add { background: transparent; color: var(--ink-soft); border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s; }
+.slot-add:active { background: var(--surface-2); }
+.rec-added { font-size: 10.5px; color: var(--accent); font-weight: 600; background: var(--accent-soft); padding: 1px 7px; border-radius: 999px; margin-left: 5px; vertical-align: middle; white-space: nowrap; }
 .cal-track { display: flex; flex-direction: column; }
 
 .cal-empty {
