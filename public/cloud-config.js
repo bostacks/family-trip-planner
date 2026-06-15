@@ -11,7 +11,7 @@
  *   4. Commit + push; everyone who opens the site now shares the same plan.
  * ========================================================================== */
 window.CLOUD = {
-  url: "",        // e.g. "https://abcdefghijkl.supabase.co"
-  anonKey: "",    // the public "anon" key
+  url: "https://ozsoucyolnxvbicraptl.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96c291Y3lvbG54dmJpY3JhcHRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0NzI2NTEsImV4cCI6MjA5NzA0ODY1MX0.ePIwWELH8HgakjIyC9S0RW8gjXgPNNbxTUVpWeZzGZA",
   tripId: "asia-trip-2026",  // shared id — same id = same shared plan
 };
