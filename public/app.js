@@ -290,6 +290,7 @@ let dayMap = null, dayRouteLayer = null, routeHidden = false;
 const dmHotelIcon = () => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-hotel">⌂</div>` });
 const dmNumIcon = (n, kind) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-num ${kind === "locked" ? "lock" : "tent"}">${n}</div>` });
 const dmDistIcon = (t) => L.divIcon({ className: "", iconSize: [0, 0], iconAnchor: [0, 0], html: `<div class="dm-dist">${t}</div>` });
+const dmLandIcon = (name) => L.divIcon({ className: "", iconSize: [0, 0], iconAnchor: [4, 4], html: `<div class="dm-land"><span class="dm-land-dot"></span><span class="dm-land-lbl">${escAttr(name)}</span></div>` });
 function renderDayMap(d) {
   const el = document.getElementById("day-map");
   if (!el || typeof L === "undefined") return;
@@ -305,14 +306,19 @@ function renderDayMap(d) {
   });
   const places = stops.filter((s) => s.kind !== "hotel");
 
-  const map = L.map(el, {
-    zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
-    boxZoom: false, keyboard: false, touchZoom: false, tap: false,
-  });
+  // Zoom everywhere (buttons + pinch + double-tap + wheel). On touch, disable
+  // one-finger drag so a vertical swipe scrolls the PAGE (pinch still zooms);
+  // on desktop, allow full drag-to-pan.
+  const touch = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  const map = L.map(el, { zoomControl: true, boxZoom: false, dragging: !touch, tap: false, touchZoom: true, doubleClickZoom: true, scrollWheelZoom: true });
   dayMap = map;
+  if (touch) el.style.touchAction = "pan-y";
   L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", {
     subdomains: "abcd", maxZoom: 19, attribution: "© OpenStreetMap, © CARTO",
   }).addTo(map);
+  // Major-landmark reference markers (always visible, non-interactive).
+  ((window.CITY_LANDMARKS || {})[d.city] || []).forEach((l) =>
+    L.marker([l.lat, l.lng], { icon: dmLandIcon(l.name), interactive: false, keyboard: false, zIndexOffset: -400 }).addTo(map));
   if (hotel) L.marker([hotel.lat, hotel.lng], { icon: dmHotelIcon() }).addTo(map).bindPopup(`🏨 ${hotel.name}`);
 
   dayRouteLayer = L.layerGroup();

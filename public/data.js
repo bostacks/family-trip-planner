@@ -238,3 +238,46 @@ window.CITY_TRANSIT = {
     tips: "Google Maps doesn't work well in mainland China — use Apple Maps or Amap (高德), and a VPN for other apps. Allow extra time for the bag X-ray at every station entrance. Didi/taxis are cheap and easy for the airport and the Great Wall.",
   },
 };
+
+/* Major landmarks per city — shown as subtle reference markers on the day map. */
+window.CITY_LANDMARKS = {
+  Tokyo: [
+    { name: "Imperial Palace", lat: 35.6852, lng: 139.7528 },
+    { name: "Tokyo Tower", lat: 35.6586, lng: 139.7454 },
+    { name: "Tokyo Skytree", lat: 35.7101, lng: 139.8107 },
+    { name: "Senso-ji", lat: 35.7148, lng: 139.7967 },
+    { name: "Shibuya", lat: 35.6595, lng: 139.7004 },
+    { name: "Shinjuku", lat: 35.6896, lng: 139.7006 },
+    { name: "Tokyo Station", lat: 35.6812, lng: 139.7671 },
+    { name: "Meiji Shrine", lat: 35.6764, lng: 139.6993 },
+    { name: "Ueno Park", lat: 35.7156, lng: 139.7745 },
+  ],
+  Osaka: [
+    { name: "Osaka Castle", lat: 34.6873, lng: 135.5259 },
+    { name: "Dotonbori", lat: 34.6687, lng: 135.5013 },
+    { name: "Umeda Sky", lat: 34.7053, lng: 135.4903 },
+    { name: "Tsutenkaku", lat: 34.6525, lng: 135.5063 },
+    { name: "Shinsaibashi", lat: 34.6723, lng: 135.5010 },
+    { name: "Shitenno-ji", lat: 34.6543, lng: 135.5165 },
+    { name: "Universal Studios", lat: 34.6654, lng: 135.4323 },
+  ],
+  Seoul: [
+    { name: "Gyeongbokgung", lat: 37.5796, lng: 126.9770 },
+    { name: "N Seoul Tower", lat: 37.5512, lng: 126.9882 },
+    { name: "Myeongdong", lat: 37.5637, lng: 126.9850 },
+    { name: "Bukchon", lat: 37.5826, lng: 126.9830 },
+    { name: "Dongdaemun (DDP)", lat: 37.5667, lng: 127.0094 },
+    { name: "Hongdae", lat: 37.5563, lng: 126.9236 },
+    { name: "Lotte World Tower", lat: 37.5125, lng: 127.1025 },
+  ],
+  Beijing: [
+    { name: "Forbidden City", lat: 39.9163, lng: 116.3972 },
+    { name: "Tiananmen Sq.", lat: 39.9055, lng: 116.3976 },
+    { name: "Temple of Heaven", lat: 39.8822, lng: 116.4066 },
+    { name: "Wangfujing", lat: 39.9151, lng: 116.4108 },
+    { name: "Lama Temple", lat: 39.9474, lng: 116.4172 },
+    { name: "Beihai Park", lat: 39.9255, lng: 116.3892 },
+    { name: "Bird's Nest", lat: 40.0027, lng: 116.3906 },
+    { name: "Summer Palace", lat: 39.9999, lng: 116.2755 },
+  ],
+};
