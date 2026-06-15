@@ -92,19 +92,22 @@ button { font-family: inherit; }
 /* Breadcrumbs */
 .crumbs {
   position: sticky; top: 0; z-index: 15;
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 9px var(--pad); background: var(--surface-2); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px var(--pad); background: var(--surface-2); border-bottom: 1px solid var(--line);
   font-size: 12px;
 }
+.crumb-path { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .crumb { background: none; border: none; padding: 0; font-size: 12px; cursor: pointer; color: var(--accent); font-weight: 600; letter-spacing: .01em; }
 .crumb.current { color: var(--ink-soft); cursor: default; font-weight: 600; }
 .crumb-sep { color: var(--muted); }
+.crumb-map { flex: 0 0 auto; background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.crumb-map:active { background: var(--surface); }
 
 /* Views */
-.view { display: none; flex: 1; padding: var(--pad); padding-bottom: 96px; }
+.view { display: none; flex: 1; padding: var(--pad); padding-bottom: 40px; }
 .view.active { display: block; }
-#view-map { padding: 0; padding-bottom: 64px; }
-#map { width: 100%; height: calc(100dvh - 64px - 120px); }
+#view-map { padding: 0; padding-bottom: 0; }
+#map { width: 100%; height: calc(100dvh - 118px); }
 
 /* Day cards (itinerary) */
 .daycard {
@@ -184,7 +187,7 @@ button { font-family: inherit; }
 .opt-btn:active { filter: brightness(.94); }
 .opt-ico { width: 18px; height: 18px; flex: 0 0 auto; }
 .toast {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 80px); transform: translateX(-50%) translateY(8px);
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 28px); transform: translateX(-50%) translateY(8px);
   background: var(--ink); color: var(--paper); padding: 11px 17px; border-radius: 999px; font-size: 13px; font-weight: 600;
   box-shadow: 0 4px 18px rgba(43,38,32,.32); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
   z-index: 70; max-width: 90vw; text-align: center;
@@ -341,18 +344,8 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 }
 .cal-ev .gallery img, .cal-ev .gallery-skel, .cal-ev .gv-video { height: 96px; min-width: 132px; }
 
-/* Bottom nav */
-.tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
-  display: flex; background: rgba(255,253,248,.92); backdrop-filter: blur(8px);
-  border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom);
-}
-.tab {
-  flex: 1; border: none; background: none; padding: 11px 0 9px; font-size: 19px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--muted); cursor: pointer;
-}
-.tab span { font-size: 11px; letter-spacing: .02em; }
-.tab.active { color: var(--accent); }
+/* Shared-cloud badge */
+.sync-badge:not(:empty) { font-size: 11px; color: var(--accent); font-weight: 600; border: 1px solid var(--accent-soft); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px; margin-left: auto; }
 
 /* Sheet */
 .sheet { position: fixed; inset: 0; z-index: 50; }
@@ -451,9 +444,8 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 @keyframes popin { from { opacity: 0; transform: translate(-50%, -47%) scale(.98); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 @media (min-width: 720px) {
   /* Fluid: the app fills the window (no fixed cap), and the itinerary grid adds
-     more columns live as you widen/resize. The full-width tab bar (default) and
-     sticky header span the window too. */
-  .view { padding: 22px 28px 96px; }
+     more columns live as you widen/resize. */
+  .view { padding: 22px 28px 40px; }
 
   /* Itinerary → responsive card grid; auto-fill reflows columns as it resizes */
   #view-itinerary.active { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; align-content: start; }
@@ -461,7 +453,7 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 
   /* Day view + map read best as a centred column within the wide shell */
   #view-day { max-width: 860px; margin-inline: auto; width: 100%; }
-  #map { height: calc(100dvh - 64px - 132px); }
+  #map { height: calc(100dvh - 118px); }
 
   /* Recommend sheet → centred modal dialog instead of a full-width bottom sheet */
   .sheet-panel {

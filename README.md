@@ -28,6 +28,32 @@ password is stored — never the plaintext. It's a soft gate for a public static
 casual visitors out, not a determined one), which is why all genuinely private data (booking
 confirmation codes, seat numbers) has been removed from the app entirely.
 
+## Cloud sync (optional — share one live plan)
+By default the plan is saved per-device in `localStorage` (no sync). To share **one
+live plan** across every device/traveller, set up a free Supabase project (~5 min):
+
+1. Create a project at <https://supabase.com>.
+2. In the **SQL editor**, run:
+   ```sql
+   create table trips (
+     id text primary key,
+     data jsonb,
+     updated_at timestamptz default now(),
+     editor text
+   );
+   alter table trips enable row level security;
+   create policy "anon all" on trips for all to anon using (true) with check (true);
+   alter publication supabase_realtime add table trips;
+   ```
+3. **Settings → API**: copy the **Project URL** and the public **anon key** into
+   `public/cloud-config.js` (the anon key is meant to be public — safe to commit).
+4. Commit + push. Everyone who opens the site now shares the same plan
+   (`tripId`), with edits syncing in near-real-time (last-write-wins per save).
+
+A small **☁ Shared** badge appears in the header when sync is active. Note: anon
+read/write is open (fine for a family trip behind the password gate, not real
+security) — that's why private booking data was removed from the app.
+
 ## Deploy (GitHub Pages)
 Already wired: `.github/workflows/pages.yml` publishes `public/` to Pages on every push to `main`.
 One-time: in the repo, **Settings → Pages → Source: GitHub Actions**. Site goes live at

@@ -16,11 +16,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,560;9..144,600&family=Inter:wght@400;500;600;650;700&display=swap" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=20260622" />
+  <link rel="stylesheet" href="styles.css?v=20260623" />
   <!-- Critical gate rules + auth check run before <body> paints, so the app
        never flashes before the login screen. -->
-  <style>#gate{display:none}html.locked #gate{display:flex}html.locked #app,html.locked .tabbar{display:none!important}</style>
-  <script src="auth.js?v=20260622"></script>
+  <style>#gate{display:none}html.locked #gate{display:flex}html.locked #app{display:none!important}</style>
+  <script src="auth.js?v=20260623"></script>
 </head>
 <body>
   <!-- Login gate -->
@@ -41,6 +41,7 @@
       <div class="appbar-row">
         <h1 id="trip-title">Asia Trip 2026</h1>
         <span id="trip-sub" class="sub"></span>
+        <span id="sync-badge" class="sync-badge"></span>
       </div>
       <div id="city-strip" class="city-strip"></div>
     </header>
@@ -55,11 +56,6 @@
       <div id="map"></div>
     </main>
 
-    <!-- Bottom nav -->
-    <nav class="tabbar">
-      <button class="tab active" data-view="itinerary">🗓️<span>Itinerary</span></button>
-      <button class="tab" data-view="map">🗺️<span>Map</span></button>
-    </nav>
   </div>
 
   <!-- Recommend sheet -->
@@ -85,10 +81,12 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="data.js?v=20260622"></script>
-  <script src="recommendations.js?v=20260622"></script>
-  <script src="recommendations-coords.js?v=20260622"></script>
-  <script src="recommendations-extra.js?v=20260622"></script>
-  <script src="app.js?v=20260622"></script>
+  <script src="data.js?v=20260623"></script>
+  <script src="recommendations.js?v=20260623"></script>
+  <script src="recommendations-coords.js?v=20260623"></script>
+  <script src="recommendations-extra.js?v=20260623"></script>
+  <script src="cloud-config.js?v=20260623"></script>
+  <script src="cloud.js?v=20260623"></script>
+  <script src="app.js?v=20260623"></script>
 </body>
 </html>

@@ -18,6 +18,19 @@ function loadTrip() {
 }
 function saveTrip() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(trip)); } catch {}
+  if (window.Cloud && Cloud.configured) Cloud.push(trip);
+}
+// Apply a plan received from the shared cloud (initial pull or another device's
+// edit). Writes straight to localStorage (NOT saveTrip) to avoid a push loop.
+function applyRemoteTrip(data, initial) {
+  if (!data || !Array.isArray(data.days)) return;
+  trip = data;
+  trip.days.forEach(ensureIds);
+  try { localStorage.setItem(LS_KEY, JSON.stringify(trip)); } catch {}
+  renderHeader(); renderItinerary();
+  if (currentView === "day" && currentDayId && findDay(currentDayId)) renderDay();
+  else if (currentView === "map") drawMap();
+  if (!initial && typeof toast === "function") toast("Plan updated from another device");
 }
 function resetTrip() {
   if (confirm("Reset the whole plan back to the original itinerary? Your changes will be lost.")) {
@@ -91,6 +104,8 @@ function fmtDate(iso, wd) {
 function renderHeader() {
   document.getElementById("trip-title").textContent = trip.title;
   document.getElementById("trip-sub").textContent = trip.party;
+  const sb = document.getElementById("sync-badge");
+  if (sb) sb.textContent = (window.Cloud && Cloud.configured) ? "☁ Shared" : "";
   const strip = document.getElementById("city-strip");
   const list = ["All", ...cities()];
   strip.innerHTML = list
@@ -1188,13 +1203,16 @@ function renderCrumbs() {
   } else {
     parts = [crumb("Itinerary", "", true)];
   }
-  el.innerHTML = parts.join('<span class="crumb-sep">›</span>');
+  // Right-aligned full-trip map toggle (replaces the old bottom tab bar).
+  const mapBtn = currentView === "map"
+    ? `<button class="crumb-map" data-go="itinerary">✕ Close map</button>`
+    : `<button class="crumb-map" data-go="map">🗺 Map</button>`;
+  el.innerHTML = `<span class="crumb-path">${parts.join('<span class="crumb-sep">›</span>')}</span>${mapBtn}`;
   el.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
 }
 
 /* ===== Init ===== */
 function renderAll() { renderHeader(); renderItinerary(); }
-document.querySelectorAll(".tab").forEach((t) => t.onclick = () => navigate(t.dataset.view === "map" ? "map" : "itinerary"));
 document.getElementById("sheet-close").onclick = closeSheet;
 document.querySelector(".sheet-backdrop").onclick = closeSheet;
 initLightbox();
@@ -1216,3 +1234,4 @@ renderAll();
 window.addEventListener("hashchange", route);
 window.__onUnlock = () => route();   // re-render after gate unlock so the day map sizes correctly
 route();   // honour any deep-link hash on load
+if (window.Cloud) Cloud.init(applyRemoteTrip, () => trip);   // shared cloud sync (no-op unless configured)
