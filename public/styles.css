@@ -178,6 +178,18 @@ button { font-family: inherit; }
 .dm-food { position: absolute; top: -7px; right: -7px; width: 14px; height: 14px; border-radius: 50%; background: #fffdf8; box-shadow: 0 0 0 1px rgba(43,38,32,.25); display: flex; align-items: center; justify-content: center; font-size: 8.5px; line-height: 1; }
 .dm-dist { transform: translate(-50%, -50%); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; padding: 1px 5px; font-size: 10px; color: var(--ink-soft); font-weight: 600; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 
+/* "Make day efficient" button + toast */
+.day-tools { margin-bottom: 18px; }
+.opt-btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 650; cursor: pointer; }
+.opt-btn:active { filter: brightness(.94); }
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 80px); transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: var(--paper); padding: 11px 17px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 18px rgba(43,38,32,.32); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  z-index: 70; max-width: 90vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* Prev / next day navigation */
 .day-nav { display: flex; gap: 10px; margin: 2px 0 18px; }
 .day-nav:last-child { margin: 18px 0 2px; }

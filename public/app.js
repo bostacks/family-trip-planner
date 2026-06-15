@@ -202,11 +202,12 @@ function renderDay() {
     </section>`;
   }).join("");
 
-  el.innerHTML = head + dayRouteMap(d) + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
+  el.innerHTML = head + dayRouteMap(d) + optimiseBar(d) + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
   el.querySelector(".back").onclick = () => (history.length > 1 ? history.back() : navigate("itinerary"));
   el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
+  const optBtn = el.querySelector("#opt-btn"); if (optBtn) optBtn.onclick = optimizeDay;
   const hideBtn = el.querySelector("#rm-hide"); if (hideBtn) hideBtn.onclick = () => setMapHidden(true);
   const showBtn = el.querySelector("#rm-show"); if (showBtn) showBtn.onclick = () => setMapHidden(false);
   renderDayMap(d);
@@ -401,6 +402,93 @@ function renderDayMap(d) {
     else if (pts.length === 1) map.setView(pts[0], 14);
   };
   setTimeout(fit, 60);
+}
+
+/* ===== "Make day efficient" — route optimiser ===== */
+const geoD = (a, b) => haversine(a.lat, a.lng, b.lat, b.lng);
+const slotOfTime = (t) => (t < 720 ? "morning" : t < 840 ? "lunch" : t < 1080 ? "afternoon" : "evening");
+function routeLen(start, items) { let t = 0, prev = start; for (const it of items) { t += geoD(prev, it); prev = it; } return t; }
+// 2-opt that never reverses a segment containing a fixed node (hotel / booked).
+function twoOpt(route, fixed) {
+  let improved = true, guard = 0;
+  while (improved && guard++ < 60) {
+    improved = false;
+    for (let i = 1; i < route.length - 1; i++) {
+      for (let k = i + 1; k < route.length; k++) {
+        let blocked = false;
+        for (let m = i; m <= k; m++) if (fixed[m]) { blocked = true; break; }
+        if (blocked) continue;
+        const a = route[i - 1], b = route[i], c = route[k], nxt = route[k + 1];
+        const before = geoD(a, b) + (nxt ? geoD(c, nxt) : 0);
+        const after = geoD(a, c) + (nxt ? geoD(b, nxt) : 0);
+        if (after + 1e-9 < before) { route.splice(i, k - i + 1, ...route.slice(i, k + 1).reverse()); improved = true; }
+      }
+    }
+  }
+}
+function optimizeDay() {
+  const d = findDay(currentDayId);
+  const hotel = trip.hotels[d.city];
+  const movable = [];
+  d.blocks.forEach((b) => b.items.forEach((it) => { if (it.type !== "transit" && it.lat != null && it.lng != null) movable.push(it); }));
+  if (!hotel || movable.length < 3) { toast("Add a few more located stops to optimise the route."); return; }
+
+  const start = { lat: hotel.lat, lng: hotel.lng };
+  const before = routeLen(start, computeSchedule(d).map((s) => s.it).filter((it) => movable.includes(it)));
+
+  // Booked-time items stay fixed (in time order); cheapest-insert the rest, then 2-opt.
+  const pinned = movable.filter((it) => typeof it.start === "number").sort((a, b) => a.start - b.start);
+  const free = movable.filter((it) => typeof it.start !== "number");
+  const route = [start, ...pinned], fixed = route.map(() => true);
+  for (const it of free) {
+    let bestPos = 1, bestInc = Infinity;
+    for (let pos = 1; pos <= route.length; pos++) {
+      const p = route[pos - 1], nx = route[pos];
+      const inc = geoD(p, it) + (nx ? geoD(it, nx) - geoD(p, nx) : 0);
+      if (inc < bestInc) { bestInc = inc; bestPos = pos; }
+    }
+    route.splice(bestPos, 0, it); fixed.splice(bestPos, 0, false);
+  }
+  twoOpt(route, fixed);
+  const order = route.slice(1);
+  const after = routeLen(start, order);
+
+  // Assign slots via a rough time-walk (honour booked times; keep meals >= midday).
+  let cursor = 540, prev = start;
+  const newB = { morning: [], lunch: [], afternoon: [], evening: [] };
+  for (const it of order) {
+    const arr = (typeof it.start === "number") ? it.start : cursor + Math.max(10, Math.round(geoD(prev, it) * 6));
+    let slot = slotOfTime(arr);
+    if (it.type === "food" && slot === "morning") slot = "lunch";
+    newB[slot].push(it);
+    cursor = arr + itemDur(it); prev = it;
+  }
+  // Keep flights/buffers and coordless items in their original-ish slot.
+  d.blocks.forEach((b) => b.items.forEach((it) => {
+    if (movable.includes(it)) return;
+    const slot = (typeof it.start === "number") ? slotOfTime(it.start) : b.slot;
+    (newB[slot] = newB[slot] || []).push(it);
+  }));
+  const effT = (it, s) => (typeof it.start === "number" ? it.start : SLOT_BASE[s] ?? 540);
+  for (const s in newB) newB[s].sort((a, b) => effT(a, s) - effT(b, s));
+  d.blocks = SLOTS.filter((s) => newB[s] && newB[s].length).map((s) => ({ slot: s, items: newB[s] }));
+
+  saveTrip(); renderDay(); renderItinerary();
+  const saved = before - after;
+  toast(saved > 0.15 ? `Route tightened to ≈ ${fmtKm(after)} (saved ≈ ${fmtKm(saved)}).` : `Already efficient — ≈ ${fmtKm(after)}.`);
+}
+function optimiseBar(d) {
+  if (d.city === "Transit") return "";
+  const n = d.blocks.flatMap((b) => b.items).filter((it) => it.type !== "transit" && it.lat != null && it.lng != null).length;
+  if (n < 3 || !trip.hotels[d.city]) return "";
+  return `<div class="day-tools"><button id="opt-btn" class="opt-btn">🧭 Make day efficient</button></div>`;
+}
+let toastT = null;
+function toast(msg) {
+  let el = document.getElementById("toast");
+  if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 3400);
 }
 
 /* ===== Drag-to-reschedule (pointer-based, works on touch + mouse) ===== */
