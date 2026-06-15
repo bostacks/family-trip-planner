@@ -260,6 +260,21 @@ button { font-family: inherit; }
 .ev-move-btn { width: 25px; height: 25px; padding: 0; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 7px; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; font-weight: 700; }
 .ev-move-btn:active { background: var(--surface-2); }
 .ev-move-btn:disabled { opacity: .28; cursor: default; }
+/* Collapse / expand a card for a compact overview */
+.ev-collapse { flex: 0 0 auto; align-self: flex-start; margin-top: -1px; width: 24px; height: 24px; padding: 0; border: none; background: transparent; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; transition: transform .2s ease; }
+.cal-ev.collapsed .ev-collapse { transform: rotate(-90deg); }
+.cal-ev.collapsed .gallery,
+.cal-ev.collapsed .ev-meta,
+.cal-ev.collapsed .ev-book,
+.cal-ev.collapsed .ev-notes,
+.cal-ev.collapsed .ev-desc,
+.cal-ev.collapsed .ev-transit,
+.cal-ev.collapsed .ev-actions,
+.cal-ev.collapsed .ev-move { display: none; }
+.cal-ev.collapsed .ev-card { padding-top: 10px; padding-bottom: 10px; }
+.cal-tools { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.cal-tool-btn { background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; padding: 5px 13px; font-size: 12px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.cal-tool-btn:active { background: var(--surface-2); }
 .cal-ev.dragging { opacity: .35; }
 .drag-ghost {
   position: fixed; z-index: 90; pointer-events: none; opacity: .96; margin: 0;

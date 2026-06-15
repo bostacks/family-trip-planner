@@ -7,6 +7,7 @@ let recCtx = null; // { dayId, slot }
 let recMode = "todo"; // 'todo' | 'food'
 let recQuery = ""; // suggestion search text
 let recSort = "stops"; // distance-sort reference: 'stops' | 'hotel' | 'me'
+const collapsedEv = new Set(); // ids of collapsed event cards (compact day overview)
 
 function loadTrip() {
   try {
@@ -213,11 +214,13 @@ function renderDay() {
     </section>`;
   }).join("");
 
-  el.innerHTML = head + dayRouteMap(d) + optimiseBar(d) + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
+  el.innerHTML = head + dayRouteMap(d) + optimiseBar(d) + dayNav + primer + calTools(d) + `<div class="cal">${body}</div>` + dayNav;
   el.querySelector(".back").onclick = () => (history.length > 1 ? history.back() : navigate("itinerary"));
   el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
+  el.querySelectorAll(".ev-collapse").forEach((b) => b.onclick = () => toggleCollapse(b));
+  const caBtn = el.querySelector("#collapse-all"); if (caBtn) { caBtn.onclick = collapseAll; updateCollapseAllLabel(); }
   const optBtn = el.querySelector("#opt-btn"); if (optBtn) optBtn.onclick = optimizeDay;
   const hideBtn = el.querySelector("#rm-hide"); if (hideBtn) hideBtn.onclick = () => setMapHidden(true);
   const showBtn = el.querySelector("#rm-show"); if (showBtn) showBtn.onclick = () => setMapHidden(false);
@@ -247,17 +250,19 @@ function calEvent(d, s, prev, canUp, canDown) {
     `<button class="ev-move-btn" data-act="${act}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}" aria-label="Move ${act}"${on ? "" : " disabled"}>${label}</button>`;
   const draggable = it.type !== "transit";
   const reorder = draggable ? `<span class="ev-move">${mv("up", "↑", canUp)}${mv("down", "↓", canDown)}</span>` : "";
+  const collapsed = collapsedEv.has(it.id);
   const book = bookingLink(it, d.city);
   const fromName = prev ? prev.name.replace(/\s*\(.*$/, "").trim() : "";
   const fromShort = fromName.length > 26 ? fromName.slice(0, 24) + "…" : fromName;
   const showTransit = prev && it.lat != null && it.type !== "transit";
-  return `<article class="cal-ev ${it.locked ? "locked" : ""} ${it.type === "transit" ? "is-transit" : ""}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}">
+  return `<article class="cal-ev ${it.locked ? "locked" : ""} ${it.type === "transit" ? "is-transit" : ""} ${collapsed ? "collapsed" : ""}" data-day="${d.id}" data-slot="${s.slot}" data-item="${it.id}">
     <div class="ev-rail"><span class="ev-time">${fmtHM(s.start)}</span><span class="ev-dot"></span><span class="ev-time end">${fmtHM(s.end)}</span></div>
     <div class="ev-card">
       <div class="ev-top">
         ${draggable ? `<span class="ev-drag" title="Drag to move">⠿</span>` : ""}
         <span class="ev-name">${it.name}</span>${it.type ? `<span class="ev-tag">${it.type}</span>` : ""}
         ${reorder}
+        <button class="ev-collapse" aria-label="Expand or collapse" title="Expand or collapse">▾</button>
       </div>
       ${it.type === "transit" ? "" : galleryShell(it.gq || it.mapsQuery || `${it.name} ${d.city}`)}
       ${showTransit ? `<a class="ev-transit" href="${transitUrl(prev, it)}" target="_blank" rel="noopener">🚇 Transit from ${fromShort} ↗</a>` : ""}
@@ -491,6 +496,30 @@ function optimizeDay() {
   saveTrip(); renderDay(); renderItinerary();
   const saved = before - after;
   toast(saved > 0.15 ? `Route tightened to ≈ ${fmtKm(after)} (saved ≈ ${fmtKm(saved)}).` : `Already efficient — ≈ ${fmtKm(after)}.`);
+}
+// Collapse/expand cards for a compact whole-day overview (no re-render, so the
+// map isn't rebuilt). State lives in collapsedEv for the session.
+function calTools(d) {
+  const n = d.blocks.flatMap((b) => b.items).length;
+  return n >= 2 ? `<div class="cal-tools"><button id="collapse-all" class="cal-tool-btn">Collapse all</button></div>` : "";
+}
+function toggleCollapse(btn) {
+  const card = btn.closest(".cal-ev"); if (!card) return;
+  const id = card.dataset.item;
+  const nowCollapsed = card.classList.toggle("collapsed");
+  if (nowCollapsed) collapsedEv.add(id); else collapsedEv.delete(id);
+  updateCollapseAllLabel();
+}
+function collapseAll() {
+  const cards = [...document.querySelectorAll("#view-day .cal-ev")];
+  const collapse = cards.some((c) => !c.classList.contains("collapsed")); // collapse if any are open
+  cards.forEach((c) => { c.classList.toggle("collapsed", collapse); collapse ? collapsedEv.add(c.dataset.item) : collapsedEv.delete(c.dataset.item); });
+  updateCollapseAllLabel();
+}
+function updateCollapseAllLabel() {
+  const ca = document.getElementById("collapse-all"); if (!ca) return;
+  const cards = [...document.querySelectorAll("#view-day .cal-ev")];
+  ca.textContent = (cards.length && cards.every((c) => c.classList.contains("collapsed"))) ? "Expand all" : "Collapse all";
 }
 function optimiseBar(d) {
   if (d.city === "Transit") return "";
