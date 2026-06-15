@@ -37,6 +37,7 @@
         try { localStorage.setItem(KEY, h); } catch (e) {}
         pw.value = "";
         document.documentElement.classList.remove("locked");
+        if (window.__onUnlock) window.__onUnlock(); // re-render now that views are visible (sizes the map)
       } else {
         err.textContent = "Incorrect password. Try again.";
         pw.select();

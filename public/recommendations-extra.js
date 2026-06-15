@@ -309,9 +309,10 @@ window.SEED_RECS_EXTRA2 = {
   },
 };
 
-// Merge both extra batches into SEED_RECS (de-duplicating by name).
+// Merge both extra batches into SEED_RECS (de-duplicating by name), attaching
+// geocoded coordinates from RECS_COORDS so suggestions can be distance-sorted.
 (function () {
-  var R = window.SEED_RECS;
+  var R = window.SEED_RECS, C = window.RECS_COORDS || {};
   [window.SEED_RECS_EXTRA, window.SEED_RECS_EXTRA2].forEach(function (E) {
     if (!R || !E) return;
     for (var city in E) {
@@ -319,7 +320,9 @@ window.SEED_RECS_EXTRA2 = {
       ["todo", "food"].forEach(function (kind) {
         var seen = new Set((R[city][kind] || []).map(function (o) { return (o.name || "").toLowerCase(); }));
         (E[city][kind] || []).forEach(function (o) {
-          if (!seen.has((o.name || "").toLowerCase())) { R[city][kind].push(o); seen.add((o.name || "").toLowerCase()); }
+          var key = (o.name || "").toLowerCase();
+          if (o.lat == null && C[key]) { o.lat = C[key][0]; o.lng = C[key][1]; }
+          if (!seen.has(key)) { R[city][kind].push(o); seen.add(key); }
         });
       });
     }

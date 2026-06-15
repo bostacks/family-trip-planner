@@ -34,6 +34,7 @@ const SLOT_BASE = { morning: 9 * 60, lunch: 12 * 60, afternoon: 14 * 60, evening
 const DUR_BY_TYPE = { experience: 180, sight: 120, museum: 120, park: 90, food: 75, shopping: 90, transit: 120 };
 const uid = () => "x" + Math.random().toString(36).slice(2, 9);
 const stars = (r) => (r ? "★ " + Number(r).toFixed(1) : "");
+const fmtKm = (km) => (km >= 10 ? Math.round(km) : km < 1 ? km.toFixed(1) : km.toFixed(1)) + " km";
 const itemDur = (it) => it.dur || DUR_BY_TYPE[it.type] || 90;
 function fmtHM(min) {
   min = ((min % 1440) + 1440) % 1440;
@@ -200,11 +201,12 @@ function renderDay() {
     </section>`;
   }).join("");
 
-  el.innerHTML = head + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
+  el.innerHTML = head + dayRouteMap(d) + dayNav + primer + `<div class="cal">${body}</div>` + dayNav;
   el.querySelector(".back").onclick = () => (history.length > 1 ? history.back() : navigate("itinerary"));
   el.querySelectorAll(".day-nav [data-go]").forEach((b) => b.onclick = () => navigate(b.dataset.go));
   el.querySelectorAll("[data-rec]").forEach((b) => b.onclick = () => openRecommend(d.id, b.dataset.rec));
   el.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => itemAction(b.dataset.act, b.dataset.day, b.dataset.slot, b.dataset.item));
+  renderDayMap(d);
   hydrateGalleries(el);
 }
 
@@ -258,6 +260,97 @@ function calEvent(d, s, prev) {
 }
 function ensureIds(day) {
   day.blocks.forEach((b) => b.items.forEach((it) => { if (!it.id) it.id = uid(); }));
+}
+
+// Container for the day's reference map (a real city map with the hotel + the
+// day's stops). Filled in by renderDayMap() after the day view is in the DOM.
+function dayRouteMap(d) {
+  if (d.city === "Transit") return "";
+  const hotel = trip.hotels[d.city];
+  const anyCoord = hotel || computeSchedule(d).some((s) => s.it.type !== "transit" && s.it.lat != null);
+  if (!anyCoord) return "";
+  return `<div class="routemap">
+    <div class="routemap-head">
+      <span class="routemap-title">Day map</span>
+      <div class="routemap-actions">
+        <span class="routemap-total" id="rm-total"></span>
+        <button class="routemap-toggle" id="rm-toggle">Hide route</button>
+      </div>
+    </div>
+    <div id="day-map" class="day-map"></div>
+    <div class="routemap-foot" id="rm-foot"></div>
+  </div>`;
+}
+
+// Day reference map: light "Positron" city tiles (landmarks/streets) with the
+// hotel always marked, and the day's stops + connecting route as a toggleable
+// overlay. Non-interactive so it never traps the page scroll. Rebuilt each
+// renderDay(), so it tracks plan changes.
+let dayMap = null, dayRouteLayer = null, routeHidden = false;
+const dmHotelIcon = () => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-hotel">⌂</div>` });
+const dmNumIcon = (n, kind) => L.divIcon({ className: "", iconSize: [22, 22], iconAnchor: [11, 11], html: `<div class="dm-num ${kind === "locked" ? "lock" : "tent"}">${n}</div>` });
+const dmDistIcon = (t) => L.divIcon({ className: "", iconSize: [0, 0], iconAnchor: [0, 0], html: `<div class="dm-dist">${t}</div>` });
+function renderDayMap(d) {
+  const el = document.getElementById("day-map");
+  if (!el || typeof L === "undefined") return;
+  if (dayMap) { try { dayMap.remove(); } catch {} dayMap = null; }
+
+  const hotel = trip.hotels[d.city];
+  const stops = [];
+  if (hotel) stops.push({ lat: hotel.lat, lng: hotel.lng, kind: "hotel", name: hotel.name });
+  computeSchedule(d).forEach((s) => {
+    const it = s.it;
+    if (it.type === "transit" || it.lat == null || it.lng == null) return;
+    stops.push({ lat: it.lat, lng: it.lng, kind: it.locked ? "locked" : "tent", name: it.name });
+  });
+  const places = stops.filter((s) => s.kind !== "hotel");
+
+  const map = L.map(el, {
+    zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+    boxZoom: false, keyboard: false, touchZoom: false, tap: false,
+  });
+  dayMap = map;
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png", {
+    subdomains: "abcd", maxZoom: 19, attribution: "© OpenStreetMap, © CARTO",
+  }).addTo(map);
+  if (hotel) L.marker([hotel.lat, hotel.lng], { icon: dmHotelIcon() }).addTo(map).bindPopup(`🏨 ${hotel.name}`);
+
+  dayRouteLayer = L.layerGroup();
+  let total = 0;
+  const line = stops.map((s) => [s.lat, s.lng]);
+  if (stops.length >= 2) {
+    L.polyline(line, { color: "#b15c38", weight: 2.5, opacity: .7, dashArray: "5 6" }).addTo(dayRouteLayer);
+    for (let i = 1; i < stops.length; i++) {
+      const km = haversine(stops[i - 1].lat, stops[i - 1].lng, stops[i].lat, stops[i].lng); total += km;
+      L.marker([(stops[i - 1].lat + stops[i].lat) / 2, (stops[i - 1].lng + stops[i].lng) / 2], { icon: dmDistIcon(fmtKm(km)) }).addTo(dayRouteLayer);
+    }
+  }
+  places.forEach((s, i) => L.marker([s.lat, s.lng], { icon: dmNumIcon(i + 1, s.kind) }).addTo(dayRouteLayer).bindPopup(`${i + 1}. ${s.name}`));
+  if (!routeHidden) dayRouteLayer.addTo(map);
+
+  const totalEl = document.getElementById("rm-total");
+  if (totalEl) totalEl.textContent = places.length ? `≈ ${fmtKm(total)} · ${places.length} stop${places.length === 1 ? "" : "s"}` : "";
+  const foot = document.getElementById("rm-foot");
+  if (foot) foot.textContent = places.length ? "Numbered in visiting order · tighter clusters mean less travel" : "Your hotel is marked — add stops to see the route.";
+  const tgl = document.getElementById("rm-toggle");
+  if (tgl) {
+    tgl.disabled = places.length === 0;
+    tgl.textContent = routeHidden ? "Show route" : "Hide route";
+    tgl.onclick = () => {
+      routeHidden = !routeHidden;
+      if (routeHidden) map.removeLayer(dayRouteLayer); else dayRouteLayer.addTo(map);
+      tgl.textContent = routeHidden ? "Show route" : "Hide route";
+    };
+  }
+
+  // Fit after the container is visible & sized.
+  const fit = () => {
+    map.invalidateSize();
+    const pts = (routeHidden || stops.length < 2) ? (hotel ? [[hotel.lat, hotel.lng]] : line) : line;
+    if (pts.length > 1) map.fitBounds(pts, { padding: [28, 28] });
+    else if (pts.length === 1) map.setView(pts[0], 14);
+  };
+  setTimeout(fit, 60);
 }
 
 /* ===== Drag-to-reschedule (pointer-based, works on touch + mouse) ===== */
@@ -413,14 +506,45 @@ function updateRecResults() {
       return terms.every((t) => hay.includes(t));
     });
   }
+  // Distance sort: order by proximity to what's already planned in earlier slots
+  // this day (or the hotel if nothing yet). Options with coords come first.
+  const ref = dayReferencePoints(d, recCtx.slot);
+  const ranked = options.map((o) => {
+    let dist = null;
+    if (o.lat != null && o.lng != null && ref.pts.length) {
+      dist = Math.min(...ref.pts.map((p) => haversine(p.lat, p.lng, o.lat, o.lng)));
+    }
+    return { o, dist };
+  });
+  if (ref.pts.length) {
+    ranked.sort((a, b) => (a.dist == null) - (b.dist == null) || (a.dist - b.dist));
+  }
+
   let inner = query ? `<div class="rec-count">${options.length} match${options.length === 1 ? "" : "es"} in ${d.city}</div>` : "";
-  inner += options.length
-    ? options.map((o, i) => recHtml(o, i)).join("")
+  if (ref.pts.length && ranked.some((x) => x.dist != null)) {
+    inner += `<div class="rec-sortnote">↕ Sorted by distance from ${ref.label}</div>`;
+  }
+  inner += ranked.length
+    ? ranked.map((x, i) => recHtml(x.o, i, x.dist)).join("")
     : `<div class="empty">${query ? "No places match your search." : "Nothing left to suggest here."}</div>`;
   resultsEl.innerHTML = inner;
-  window.__recs = options;
+  window.__recs = ranked.map((x) => x.o);
   resultsEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
   hydrateGalleries(resultsEl);
+}
+// Reference points for distance sorting: locations already chosen in EARLIER
+// slots of this day; falls back to the city's hotel.
+function dayReferencePoints(d, slot) {
+  const idx = SLOTS.indexOf(slot);
+  const pts = [];
+  d.blocks.forEach((b) => {
+    if (SLOTS.indexOf(b.slot) >= idx) return;
+    b.items.forEach((it) => { if (it.lat != null && it.lng != null && it.type !== "transit") pts.push({ lat: it.lat, lng: it.lng }); });
+  });
+  if (pts.length) return { pts, label: "your earlier stops" };
+  const h = trip.hotels[d.city];
+  if (h) return { pts: [{ lat: h.lat, lng: h.lng }], label: "your hotel" };
+  return { pts: [], label: "" };
 }
 // Outbound link: prefer a curated official/booking URL, else a Google Maps
 // search that always resolves to the real place (hours, reviews, directions).
@@ -555,7 +679,8 @@ function initPullToRefresh() {
   const TH = 70, MAX = 110;
   let startY = null, startX = null, pulling = false, dist = 0;
 
-  const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0;
+  const scrollTop = () => Math.max(window.scrollY || 0, document.documentElement.scrollTop || 0, document.body.scrollTop || 0);
+  const atTop = () => scrollTop() <= 0;
   function eligible(t) {
     if (document.documentElement.classList.contains("locked")) return false;
     if (drag) return false;
@@ -584,8 +709,12 @@ function initPullToRefresh() {
     setTimeout(() => location.reload(), 550);
   }
   document.addEventListener("touchstart", (e) => {
-    if (e.touches.length !== 1 || !atTop() || !eligible(e.target)) { startY = null; return; }
-    startY = e.touches[0].clientY; startX = e.touches[0].clientX; pulling = false;
+    pulling = false;
+    // Must be at the very top AND the finger must start near the top of the
+    // screen — so a swipe lower down (e.g. scrolling up from the bottom) never
+    // arms the pull-to-refresh.
+    if (e.touches.length !== 1 || !atTop() || e.touches[0].clientY > 150 || !eligible(e.target)) { startY = null; return; }
+    startY = e.touches[0].clientY; startX = e.touches[0].clientX;
     ptr.classList.remove("animating");
   }, { passive: true });
   document.addEventListener("touchmove", (e) => {
@@ -606,13 +735,14 @@ function initPullToRefresh() {
   document.addEventListener("touchend", end);
   document.addEventListener("touchcancel", end);
 }
-function recHtml(o, i) {
+function recHtml(o, i, dist) {
   const city = findDay(recCtx.dayId)?.city;
   const official = !!o.url;
   return `<div class="rec">
     <div class="name">${o.name}</div>
     ${galleryShell(o.mapsQuery || `${o.name} ${city || ""}`)}
     <div class="row">
+      ${dist != null ? `<span class="pill dist">📍 ${fmtKm(dist)}</span>` : ""}
       ${o.rating ? `<span class="stars">${stars(o.rating)}</span>` : ""}
       ${o.area ? `<span class="pill">📍 ${o.area}</span>` : ""}
       ${o.type ? `<span class="pill">${o.type}</span>` : ""}
@@ -846,4 +976,5 @@ document.addEventListener("keydown", (e) => {
 trip.days.forEach(ensureIds); saveTrip();
 renderAll();
 window.addEventListener("hashchange", route);
+window.__onUnlock = () => route();   // re-render after gate unlock so the day map sizes correctly
 route();   // honour any deep-link hash on load

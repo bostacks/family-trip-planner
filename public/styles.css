@@ -20,7 +20,9 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; overflow-x: hidden; }
+/* overflow-x: clip (not hidden) — `hidden` would force overflow-y to compute to
+   `auto`, making <body> the scroll container and breaking window scroll / PTR. */
+html, body { margin: 0; height: 100%; overflow-x: clip; }
 body {
   font-family: var(--sans);
   background: var(--paper);
@@ -135,6 +137,23 @@ button { font-family: inherit; }
 .day-head-text .eyebrow { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .day-head-text h2 { font-family: var(--serif); margin: 3px 0 0; font-size: 26px; font-weight: 560; letter-spacing: -.015em; }
 .day-head-text .sub { font-size: 12.5px; color: var(--muted); display: block; margin-top: 4px; }
+
+/* Day route map (paper schematic SVG) */
+.routemap { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px 11px; margin-bottom: 18px; }
+.routemap-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.routemap-title { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); font-weight: 700; }
+.routemap-total { font-size: 11.5px; color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.routemap-foot { font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+.routemap-actions { display: flex; align-items: center; gap: 10px; }
+.routemap-toggle { background: transparent; border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+.routemap-toggle:active { background: var(--surface-2); }
+.routemap-toggle:disabled { opacity: .4; cursor: default; }
+.day-map { width: 100%; height: 200px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+.dm-hotel { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; background: var(--ink); color: var(--paper); border-radius: 6px; font-size: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.dm-num { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.dm-num.lock { background: var(--accent); }
+.dm-num.tent { background: #a89e8c; }
+.dm-dist { transform: translate(-50%, -50%); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; padding: 1px 5px; font-size: 10px; color: var(--ink-soft); font-weight: 600; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 
 /* Prev / next day navigation */
 .day-nav { display: flex; gap: 10px; margin: 2px 0 18px; }
@@ -315,6 +334,8 @@ a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 }
 .rec-search input:focus { outline: none; border-color: var(--accent); }
 .rec-count { font-size: 12px; color: var(--muted); margin: 2px 2px 12px; }
+.rec-sortnote { font-size: 11.5px; color: var(--accent); font-weight: 600; margin: 0 2px 12px; }
+.pill.dist { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; font-variant-numeric: tabular-nums; }
 .rec-toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
 .rec-toolbar button { flex: 1; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 10px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
 .rec-toolbar button.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
