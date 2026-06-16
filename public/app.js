@@ -7,6 +7,8 @@ let recCtx = null; // { dayId, slot }
 let recMode = "todo"; // 'todo' | 'food'
 let recQuery = ""; // suggestion search text
 let recSort = "stops"; // distance-sort reference: 'stops' | 'hotel' | 'me'
+const REC_PAGE = 50; // how many suggestions to render per page (the food DB has ~1000/city)
+let recLimit = REC_PAGE; // current cap on rendered suggestions ("Show more" raises it)
 const collapsedEv = new Set(); // ids of collapsed event cards (compact day overview)
 
 function loadTrip() {
@@ -763,7 +765,8 @@ function ensureUserLoc(cb) {
 // Recommendations come from the baked-in SEED_RECS (no API key). With a search
 // query we match across BOTH things-to-do and restaurants for the city; without
 // one we show the active toggle's list. Anything already on the day is hidden.
-function updateRecResults() {
+function updateRecResults(keepPage) {
+  if (!keepPage) recLimit = REC_PAGE; // any filter change resets to the first page
   const d = findDay(recCtx.dayId);
   const city = (window.SEED_RECS || {})[d.city];
   const resultsEl = document.getElementById("rec-results");
@@ -799,16 +802,25 @@ function updateRecResults() {
     ranked.sort((a, b) => (a.dist == null) - (b.dist == null) || (a.dist - b.dist));
   }
 
+  // Only render up to recLimit cards — rendering all ~1000 restaurants at once
+  // froze/crashed mobile browsers. They're distance-sorted, so the nearest show
+  // first and "Show more" reveals the rest in pages.
+  const shown = ranked.slice(0, recLimit);
   let inner = query ? `<div class="rec-count">${options.length} match${options.length === 1 ? "" : "es"} in ${d.city}</div>` : "";
   if (ref.pts.length && ranked.some((x) => x.dist != null)) {
     inner += `<div class="rec-sortnote">↕ Sorted by distance from ${ref.label}</div>`;
   }
-  inner += ranked.length
-    ? ranked.map((x, i) => recHtml(x.o, i, x.dist, already.has((x.o.name || "").toLowerCase()))).join("")
+  inner += shown.length
+    ? shown.map((x, i) => recHtml(x.o, i, x.dist, already.has((x.o.name || "").toLowerCase()))).join("")
     : `<div class="empty">${query ? "No places match your search." : "Nothing to suggest here."}</div>`;
+  if (ranked.length > shown.length) {
+    inner += `<button class="rec-more" id="rec-more">Show more · ${shown.length} of ${ranked.length}</button>`;
+  }
   resultsEl.innerHTML = inner;
   window.__recs = ranked.map((x) => x.o);
   resultsEl.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => addRec(+b.dataset.add));
+  const moreBtn = resultsEl.querySelector("#rec-more");
+  if (moreBtn) moreBtn.onclick = () => { recLimit += REC_PAGE; updateRecResults(true); };
   hydrateGalleries(resultsEl);
 }
 function priorStops(d, slot) {
