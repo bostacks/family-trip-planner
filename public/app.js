@@ -815,7 +815,10 @@ function priorStops(d, slot) {
   const idx = SLOTS.indexOf(slot);
   const pts = [];
   d.blocks.forEach((b) => {
-    if (SLOTS.indexOf(b.slot) >= idx) return;
+    // Include everything planned SO FAR today (this slot + earlier ones); only
+    // skip later slots. Otherwise stops in the current slot are ignored and the
+    // sort falls back to the hotel — which made "Earlier stops" look broken.
+    if (SLOTS.indexOf(b.slot) > idx) return;
     b.items.forEach((it) => { if (it.lat != null && it.lng != null && it.type !== "transit") pts.push({ lat: it.lat, lng: it.lng }); });
   });
   return pts;
@@ -827,7 +830,7 @@ function refPointsForSort(d, slot, mode) {
   if (mode === "me" && userLoc) return { pts: [{ lat: userLoc.lat, lng: userLoc.lng }], label: "your location" };
   if (mode === "stops") {
     const pts = priorStops(d, slot);
-    if (pts.length) return { pts, label: "your earlier stops" };
+    if (pts.length) return { pts, label: "your stops so far" };
   }
   if (hotel) return { pts: [{ lat: hotel.lat, lng: hotel.lng }], label: "your hotel" };
   return { pts: [], label: "" };
