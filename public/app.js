@@ -255,6 +255,34 @@ function bookingLink(it, city) {
 function transitUrl(prev, it) {
   return `https://www.google.com/maps/dir/?api=1&origin=${prev.lat},${prev.lng}&destination=${it.lat},${it.lng}&travelmode=transit`;
 }
+// Airport ground-transfers (the 🧳 checkout/travel-to-airport buffers): with five
+// people and luggage a ride-hail usually beats the train, so offer Uber up front
+// instead of defaulting to transit. The buffer's own lat/lng is the airport, so we
+// deep-link a drop-off there. Mainland China has no Uber — hand off to DiDi/taxi.
+const AIRPORT_CODES = ["YVR", "HND", "NRT", "KIX", "ITM", "ICN", "GMP", "PEK", "PKX", "PVG"];
+const CHINA_AIRPORTS = ["PEK", "PKX", "PVG", "SHA", "CAN", "CTU", "SZX"];
+function hasCode(it, codes) {
+  const hay = `${it.name || ""} ${it.area || ""}`;
+  return codes.some((c) => new RegExp(`\\b${c}\\b`).test(hay));
+}
+function isAirportRun(it) {
+  return it.type === "transit" && /🧳/.test(it.name || "") && it.lat != null && hasCode(it, AIRPORT_CODES);
+}
+function dirTo(it, mode, origin) {
+  const o = origin ? `origin=${origin.lat},${origin.lng}&` : "";
+  return `https://www.google.com/maps/dir/?api=1&${o}destination=${it.lat},${it.lng}&travelmode=${mode}`;
+}
+// Ride-hail hand-off for an airport run. Returns the primary (ride) + transit fallback.
+function rideHail(it, prev) {
+  const dest = (it.area || "").replace(/^.*→\s*/, "").trim() || "airport";
+  if (hasCode(it, CHINA_AIRPORTS)) {
+    // Uber doesn't operate in mainland China; DiDi is the local equivalent (driving route).
+    return { label: `🚗 DiDi / taxi to ${dest}`, url: dirTo(it, "driving", prev), alt: dirTo(it, "transit", prev) };
+  }
+  const u = `https://m.uber.com/ul/?action=setPickup&pickup=my_location` +
+    `&dropoff[latitude]=${it.lat}&dropoff[longitude]=${it.lng}&dropoff[nickname]=${encodeURIComponent(dest)}`;
+  return { label: `🚗 Uber to ${dest}`, url: u, alt: dirTo(it, "transit", prev) };
+}
 // One timed event on the calendar: a time rail on the left + a card.
 function calEvent(d, s, prev, canUp, canDown) {
   const it = s.it;
@@ -281,6 +309,10 @@ function calEvent(d, s, prev, canUp, canDown) {
         <button class="ev-collapse" aria-label="Expand or collapse" title="Expand or collapse">▾</button>
       </div>
       ${it.type === "transit" ? "" : galleryShell(it.gq || it.mapsQuery || `${it.name} ${d.city}`)}
+      ${isAirportRun(it) ? (() => { const r = rideHail(it, prev); return `<div class="ev-ride">
+        <a class="ev-transit ride" href="${r.url}" target="_blank" rel="noopener">${r.label} ↗</a>
+        <a class="ev-transit alt" href="${r.alt}" target="_blank" rel="noopener">🚆 or train ↗</a>
+      </div>` })() : ""}
       ${showTransit ? `<a class="ev-transit" href="${transitUrl(prev, it)}" target="_blank" rel="noopener">🚇 Transit from ${fromShort} ↗</a>` : ""}
       ${meta ? `<div class="ev-meta">${meta}</div>` : ""}
       ${it.booking && it.booking !== "—" ? (book

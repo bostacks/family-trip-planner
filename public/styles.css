@@ -276,6 +276,7 @@ button { font-family: inherit; }
 .cal-ev.collapsed .ev-notes,
 .cal-ev.collapsed .ev-desc,
 .cal-ev.collapsed .ev-transit,
+.cal-ev.collapsed .ev-ride,
 .cal-ev.collapsed .ev-actions,
 .cal-ev.collapsed .ev-move { display: none; }
 .cal-ev.collapsed .ev-card { padding-top: 10px; padding-bottom: 10px; }
@@ -303,6 +304,11 @@ body.is-dragging { cursor: grabbing; user-select: none; -webkit-user-select: non
 a.ev-act { color: var(--accent); border-color: var(--accent-soft); }
 .ev-transit { display: inline-block; margin-top: 9px; font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; }
 .ev-transit:active { opacity: .65; }
+.ev-ride { display: flex; flex-wrap: wrap; align-items: baseline; gap: 14px; margin-top: 9px; }
+.ev-ride .ev-transit { margin-top: 0; }
+.ev-ride .ev-transit.ride { padding: 5px 12px; border-radius: 999px; background: var(--accent); color: #fff; }
+.ev-ride .ev-transit.ride:active { opacity: .8; }
+.ev-ride .ev-transit.alt { color: var(--muted); font-weight: 500; }
 .ev-book.link { display: inline-block; text-decoration: none; }
 .ev-book.link:active { opacity: .65; }
 
