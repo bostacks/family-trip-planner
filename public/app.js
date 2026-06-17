@@ -1021,7 +1021,12 @@ function initPullToRefresh() {
     ptr.classList.add("animating", "ready");
     ptr.style.transform = "translateY(10px)"; ptr.style.opacity = "1";
     ring.style.transform = ""; ring.classList.add("spin");
-    setTimeout(() => location.reload(), 550);
+    // Wipe the service-worker caches first so the reload genuinely refetches —
+    // otherwise an installed iOS app just reloads the same cached page.
+    setTimeout(async () => {
+      try { if (window.caches) { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); } } catch {}
+      location.reload();
+    }, 550);
   }
   document.addEventListener("touchstart", (e) => {
     pulling = false;
@@ -1049,6 +1054,21 @@ function initPullToRefresh() {
   }
   document.addEventListener("touchend", end);
   document.addEventListener("touchcancel", end);
+}
+
+/* ===== Service worker — network-first updates + offline ===== */
+// Installed (home-screen) apps otherwise pin a stale snapshot. The SW serves the
+// latest deploy when online and falls back to cache offline; when a new SW takes
+// control (after a deploy) we reload once so the app picks up fresh assets.
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
 }
 function recHtml(o, i, dist, added) {
   const city = findDay(recCtx.dayId)?.city;
@@ -1333,6 +1353,7 @@ document.addEventListener("keydown", (e) => {
 });
 trip.days.forEach(ensureIds); saveTrip();
 renderAll();
+registerServiceWorker();
 window.addEventListener("hashchange", route);
 window.__onUnlock = () => route();   // re-render after gate unlock so the day map sizes correctly
 route();   // honour any deep-link hash on load
