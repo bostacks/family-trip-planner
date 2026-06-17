@@ -35,16 +35,15 @@
   async function fetchLoc(lat, lng) {
     const key = keyFor(lat, lng);
     const ent = cache[key];
-    if (ent && Date.now() - ent.t < TTL && ent.d) return ent.d;
+    if (ent && Date.now() - ent.t < TTL && ent.d) return { t: ent.t, daily: ent.d };
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
       `&timezone=auto&forecast_days=16`;
-    let daily = (ent && ent.d) || {};
     try {
       const r = await fetch(url);
       if (r.ok) {
         const dd = (await r.json()).daily || {};
-        daily = {};
+        const daily = {};
         (dd.time || []).forEach((date, i) => {
           daily[date] = {
             code: dd.weather_code ? dd.weather_code[i] : null,
@@ -55,9 +54,20 @@
         });
         cache[key] = { t: Date.now(), d: daily };
         save();
+        return { t: cache[key].t, daily };
       }
     } catch { /* offline → fall back to whatever was cached */ }
-    return daily;
+    return ent ? { t: ent.t, daily: ent.d } : { t: null, daily: {} };
+  }
+
+  // Human "how long ago" label for the forecast's fetch time.
+  function ago(t) {
+    if (!t) return "";
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 60) return "just now";
+    const m = Math.round(s / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60); if (h < 24) return `${h}h ago`;
+    return `${Math.round(h / 24)}d ago`;
   }
 
   // Placeholder chip; real data is injected by hydrate() after render.
@@ -66,16 +76,24 @@
     return `<span class="wx" data-wx="${date}" data-lat="${lat}" data-lng="${lng}"><span class="wx-skel"></span></span>`;
   }
 
-  function fill(el, info) {
+  function fill(el, info, t) {
     if (!info || info.code == null || info.tmax == null) { el.remove(); return; } // no forecast → hide chip
     const [ico, label] = describe(info.code);
     const hi = Math.round(info.tmax), lo = Math.round(info.tmin), pop = info.pop;
+    const updated = ago(t);
     el.classList.add("ready");
-    el.title = `${label}${pop != null ? ` · ${pop}% chance of rain` : ""} (°C)`;
+    el.title = `${label}${pop != null ? ` · ${pop}% chance of rain` : ""} (°C)${updated ? ` · updated ${updated}` : ""}`;
     el.innerHTML =
       `<span class="wx-ico">${ico}</span>` +
       `<span class="wx-temp">${hi}°<span class="wx-lo">/${lo}°</span></span>` +
       (pop != null && pop >= 30 ? `<span class="wx-pop">💧${pop}%</span>` : "");
+    // In the day-view header, also show the update time visibly beside the chip.
+    const host = el.closest(".day-wx");
+    if (host && updated) {
+      let note = host.querySelector(".wx-updated");
+      if (!note) { note = document.createElement("span"); note.className = "wx-updated"; host.appendChild(note); }
+      note.textContent = `Updated ${updated}`;
+    }
   }
 
   // Fill every weather placeholder under `root`, one fetch per unique location.
@@ -89,8 +107,8 @@
     });
     for (const [k, list] of groups) {
       const [lat, lng] = k.split(",").map(Number);
-      const daily = await fetchLoc(lat, lng);
-      list.forEach((el) => fill(el, daily[el.dataset.wx]));
+      const { t, daily } = await fetchLoc(lat, lng);
+      list.forEach((el) => fill(el, daily[el.dataset.wx], t));
     }
   }
 
