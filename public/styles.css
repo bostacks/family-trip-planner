@@ -141,6 +141,18 @@ button { font-family: inherit; }
 .day-head-text h2 { font-family: var(--serif); margin: 3px 0 0; font-size: 26px; font-weight: 560; letter-spacing: -.015em; }
 .day-head-text .sub { font-size: 12.5px; color: var(--muted); display: block; margin-top: 4px; }
 
+/* Weather chip (forecast). Used in the day header and on each itinerary card. */
+.wx { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; line-height: 1; color: var(--ink-soft); }
+.wx .wx-ico { font-size: 14px; }
+.wx .wx-temp { font-weight: 600; }
+.wx .wx-temp .wx-lo { font-weight: 500; color: var(--muted); }
+.wx .wx-pop { color: var(--accent); font-weight: 600; }
+.wx-skel { display: inline-block; width: 52px; height: 12px; border-radius: 6px; background: var(--surface-2); animation: wxpulse 1.2s ease-in-out infinite; }
+@keyframes wxpulse { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
+.day-wx { margin-top: 9px; }
+.day-wx .wx { font-size: 13.5px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); }
+.daycard .meta .wx { font-size: 12px; }
+
 /* Day route map (paper schematic SVG) */
 .routemap { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px 11px; margin-bottom: 18px; }
 .routemap-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }

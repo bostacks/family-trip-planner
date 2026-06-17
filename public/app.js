@@ -134,6 +134,7 @@ function renderItinerary() {
   el.innerHTML = days.map((d) => {
     const main = mainItem(d);
     const cls = d.city === "Transit" ? "transit" : "";
+    const [wla, wln] = dayLatLng(d);
     return `<div class="daycard" data-day="${d.id}">
       <div class="daycard-top">
         <span class="date">${fmtDate(d.date, d.weekday)}</span>
@@ -141,6 +142,7 @@ function renderItinerary() {
       </div>
       <div class="main">${main ? main.name : "—"}</div>
       <div class="meta">
+        ${window.Weather ? window.Weather.shell(d.date, wla, wln) : ""}
         ${main && main.rating ? `<span class="stars">${stars(main.rating)}</span>` : ""}
         ${main && main.booking && main.booking !== "—" ? `<span>🎟️ ${main.booking}</span>` : ""}
         <span>${countItems(d)} stop${countItems(d) === 1 ? "" : "s"}</span>
@@ -148,6 +150,15 @@ function renderItinerary() {
     </div>`;
   }).join("");
   el.querySelectorAll("[data-day]").forEach((c) => c.onclick = () => openDay(c.dataset.day));
+  if (window.Weather) window.Weather.hydrate(el);
+}
+// A day's map point for weather: the city's hotel, else the first stop with coords
+// (covers Transit days, which use their departure/arrival airport).
+function dayLatLng(d) {
+  const h = trip.hotels[d.city];
+  if (h) return [h.lat, h.lng];
+  for (const b of d.blocks) for (const it of b.items) if (it.lat != null && it.lng != null) return [it.lat, it.lng];
+  return [null, null];
 }
 function mainItem(day) {
   for (const b of day.blocks) for (const it of b.items) if (it.locked && it.type !== "transit") return it;
@@ -168,6 +179,7 @@ function renderDay() {
   const sched = computeSchedule(d);
   const isTransit = d.city === "Transit";
 
+  const [wla, wln] = dayLatLng(d);
   const head = `
     <div class="day-head">
       <button class="back">‹ Back</button>
@@ -175,6 +187,7 @@ function renderDay() {
         <span class="eyebrow">${fmtDate(d.date, d.weekday)}</span>
         <h2>${isTransit ? "Travel day" : d.city}</h2>
         <span class="sub">${isTransit ? "In transit" : (trip.hotels[d.city]?.name || "")}</span>
+        ${window.Weather ? `<div class="day-wx">${window.Weather.shell(d.date, wla, wln)}</div>` : ""}
       </div>
     </div>`;
 
@@ -244,6 +257,7 @@ function renderDay() {
   const showBtn = el.querySelector("#rm-show"); if (showBtn) showBtn.onclick = () => setMapHidden(false);
   renderDayMap(d);
   hydrateGalleries(el);
+  if (window.Weather) window.Weather.hydrate(el);
 }
 
 // Make a booking note clickable when it implies an action (reserve/buy/ticket…).
